@@ -1,0 +1,205 @@
+openapi: 3.1.0
+info:
+  title: Kurumsal AI Egitim Platformu API
+  version: 0.1.0-design-freeze
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+tags:
+  - name: Identity
+  - name: Organization
+  - name: Training
+  - name: Learning
+  - name: QuestionBank
+  - name: Assessment
+  - name: Certification
+  - name: AI
+  - name: Analytics
+  - name: Notification
+  - name: Audit
+paths:
+  /me:
+    get: {tags: [Identity], operationId: getMe, responses: {'200': {$ref: '#/components/responses/Ok'}, '401': {$ref: '#/components/responses/Error'}}}
+  /organization:
+    get: {tags: [Organization], operationId: getOrganization, responses: {'200': {$ref: '#/components/responses/Ok'}}}
+  /organization/units:
+    get: {tags: [Organization], operationId: listOrganizationUnits, responses: {'200': {$ref: '#/components/responses/Ok'}}}
+  /users:
+    get: {tags: [Identity], operationId: listUsers, responses: {'200': {$ref: '#/components/responses/Ok'}, '403': {$ref: '#/components/responses/Error'}}}
+  /users/invitations:
+    post:
+      tags: [Identity]
+      operationId: inviteUser
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {$ref: '#/components/requestBodies/JsonBody'}
+      responses: {'202': {$ref: '#/components/responses/Accepted'}, '403': {$ref: '#/components/responses/Error'}, '409': {$ref: '#/components/responses/Error'}}
+  /users/{userId}:
+    patch: {tags: [Identity], operationId: updateUser, parameters: [{$ref: '#/components/parameters/UserId'}], requestBody: {$ref: '#/components/requestBodies/JsonBody'}, responses: {'200': {$ref: '#/components/responses/Ok'}, '403': {$ref: '#/components/responses/Error'}}}
+  /roles:
+    get: {tags: [Identity], operationId: listRoles, responses: {'200': {$ref: '#/components/responses/Ok'}}}
+  /users/{userId}/roles:
+    put: {tags: [Identity], operationId: replaceUserRoles, parameters: [{$ref: '#/components/parameters/UserId'}], requestBody: {$ref: '#/components/requestBodies/JsonBody'}, responses: {'200': {$ref: '#/components/responses/Ok'}, '403': {$ref: '#/components/responses/Error'}}}
+  /trainings:
+    get: {tags: [Training], operationId: listTrainings, responses: {'200': {$ref: '#/components/responses/Ok'}}}
+    post: {tags: [Training], operationId: createTraining, requestBody: {$ref: '#/components/requestBodies/JsonBody'}, responses: {'201': {$ref: '#/components/responses/Created'}, '403': {$ref: '#/components/responses/Error'}}}
+  /trainings/{trainingId}:
+    get: {tags: [Training], operationId: getTraining, parameters: [{$ref: '#/components/parameters/TrainingId'}], responses: {'200': {$ref: '#/components/responses/Ok'}, '404': {$ref: '#/components/responses/Error'}}}
+    patch: {tags: [Training], operationId: updateTraining, parameters: [{$ref: '#/components/parameters/TrainingId'}], requestBody: {$ref: '#/components/requestBodies/JsonBody'}, responses: {'200': {$ref: '#/components/responses/Ok'}, '409': {$ref: '#/components/responses/Error'}}}
+  /trainings/{trainingId}/submit-review:
+    post: {tags: [Training], operationId: submitTrainingReview, parameters: [{$ref: '#/components/parameters/TrainingId'}], responses: {'200': {$ref: '#/components/responses/Ok'}, '409': {$ref: '#/components/responses/Error'}}}
+  /trainings/{trainingId}/publish:
+    post: {tags: [Training], operationId: publishTraining, parameters: [{$ref: '#/components/parameters/TrainingId'}, {$ref: '#/components/parameters/IdempotencyKey'}], responses: {'200': {$ref: '#/components/responses/Ok'}, '403': {$ref: '#/components/responses/Error'}, '409': {$ref: '#/components/responses/Error'}}}
+  /trainings/{trainingId}/archive:
+    post: {tags: [Training], operationId: archiveTraining, parameters: [{$ref: '#/components/parameters/TrainingId'}], responses: {'200': {$ref: '#/components/responses/Ok'}}}
+  /trainings/{trainingId}/versions:
+    get: {tags: [Training], operationId: listTrainingVersions, parameters: [{$ref: '#/components/parameters/TrainingId'}], responses: {'200': {$ref: '#/components/responses/Ok'}}}
+    post: {tags: [Training], operationId: createTrainingVersion, parameters: [{$ref: '#/components/parameters/TrainingId'}], requestBody: {$ref: '#/components/requestBodies/JsonBody'}, responses: {'201': {$ref: '#/components/responses/Created'}}}
+  /trainings/{trainingId}/objectives:
+    get: {tags: [Training], operationId: listLearningObjectives, parameters: [{$ref: '#/components/parameters/TrainingId'}], responses: {'200': {$ref: '#/components/responses/Ok'}}}
+    post: {tags: [Training], operationId: createLearningObjective, parameters: [{$ref: '#/components/parameters/TrainingId'}], requestBody: {$ref: '#/components/requestBodies/JsonBody'}, responses: {'201': {$ref: '#/components/responses/Created'}}}
+  /learning-objectives/{objectiveId}:
+    patch: {tags: [Training], operationId: updateLearningObjective, parameters: [{$ref: '#/components/parameters/ObjectiveId'}], requestBody: {$ref: '#/components/requestBodies/JsonBody'}, responses: {'200': {$ref: '#/components/responses/Ok'}}}
+  /trainings/{trainingId}/modules:
+    get: {tags: [Training], operationId: listTrainingModules, parameters: [{$ref: '#/components/parameters/TrainingId'}], responses: {'200': {$ref: '#/components/responses/Ok'}}}
+    post: {tags: [Training], operationId: createTrainingModule, parameters: [{$ref: '#/components/parameters/TrainingId'}], requestBody: {$ref: '#/components/requestBodies/JsonBody'}, responses: {'201': {$ref: '#/components/responses/Created'}}}
+  /content/sources:
+    post: {tags: [Training], operationId: createContentSource, requestBody: {$ref: '#/components/requestBodies/JsonBody'}, responses: {'201': {$ref: '#/components/responses/Created'}}}
+  /content/{contentId}/versions:
+    post: {tags: [Training], operationId: createContentVersion, parameters: [{$ref: '#/components/parameters/ContentId'}], requestBody: {$ref: '#/components/requestBodies/JsonBody'}, responses: {'201': {$ref: '#/components/responses/Created'}}}
+  /assignments:
+    get: {tags: [Learning], operationId: listAssignments, responses: {'200': {$ref: '#/components/responses/Ok'}}}
+    post: {tags: [Learning], operationId: createAssignment, parameters: [{$ref: '#/components/parameters/IdempotencyKey'}], requestBody: {$ref: '#/components/requestBodies/JsonBody'}, responses: {'201': {$ref: '#/components/responses/Created'}, '409': {$ref: '#/components/responses/Error'}}}
+  /learner/assignments:
+    get: {tags: [Learning], operationId: listMyAssignments, responses: {'200': {$ref: '#/components/responses/Ok'}}}
+  /learner/trainings/{trainingId}:
+    get: {tags: [Learning], operationId: getMyTraining, parameters: [{$ref: '#/components/parameters/TrainingId'}], responses: {'200': {$ref: '#/components/responses/Ok'}, '403': {$ref: '#/components/responses/Error'}}}
+  /learner/progress/{trainingVersionId}:
+    put: {tags: [Learning], operationId: updateMyTrainingProgress, parameters: [{$ref: '#/components/parameters/TrainingVersionId'}], requestBody: {$ref: '#/components/requestBodies/JsonBody'}, responses: {'200': {$ref: '#/components/responses/Ok'}}}
+  /learner/modules/{moduleId}/progress:
+    put: {tags: [Learning], operationId: updateMyModuleProgress, parameters: [{$ref: '#/components/parameters/ModuleId'}], requestBody: {$ref: '#/components/requestBodies/JsonBody'}, responses: {'200': {$ref: '#/components/responses/Ok'}}}
+  /learner/videos/{videoId}/progress:
+    put: {tags: [Learning], operationId: updateMyVideoProgress, parameters: [{$ref: '#/components/parameters/VideoId'}], requestBody: {$ref: '#/components/requestBodies/JsonBody'}, responses: {'200': {$ref: '#/components/responses/Ok'}}}
+  /learner/trainings/{trainingVersionId}/resume:
+    get: {tags: [Learning], operationId: getMyResumePosition, parameters: [{$ref: '#/components/parameters/TrainingVersionId'}], responses: {'200': {$ref: '#/components/responses/Ok'}}}
+  /questions:
+    get: {tags: [QuestionBank], operationId: listQuestions, responses: {'200': {$ref: '#/components/responses/Ok'}}}
+    post: {tags: [QuestionBank], operationId: createQuestion, requestBody: {$ref: '#/components/requestBodies/JsonBody'}, responses: {'201': {$ref: '#/components/responses/Created'}}}
+  /questions/{questionId}:
+    get: {tags: [QuestionBank], operationId: getQuestion, parameters: [{$ref: '#/components/parameters/QuestionId'}], responses: {'200': {$ref: '#/components/responses/Ok'}}}
+    patch: {tags: [QuestionBank], operationId: updateQuestion, parameters: [{$ref: '#/components/parameters/QuestionId'}], requestBody: {$ref: '#/components/requestBodies/JsonBody'}, responses: {'200': {$ref: '#/components/responses/Ok'}, '409': {$ref: '#/components/responses/Error'}}}
+  /questions/{questionId}/submit-review:
+    post: {tags: [QuestionBank], operationId: submitQuestionReview, parameters: [{$ref: '#/components/parameters/QuestionId'}], responses: {'200': {$ref: '#/components/responses/Ok'}}}
+  /questions/{questionId}/approve:
+    post: {tags: [QuestionBank], operationId: approveQuestion, parameters: [{$ref: '#/components/parameters/QuestionId'}], responses: {'200': {$ref: '#/components/responses/Ok'}, '403': {$ref: '#/components/responses/Error'}}}
+  /questions/{questionId}/retire:
+    post: {tags: [QuestionBank], operationId: retireQuestion, parameters: [{$ref: '#/components/parameters/QuestionId'}], responses: {'200': {$ref: '#/components/responses/Ok'}}}
+  /assessments:
+    get: {tags: [Assessment], operationId: listAssessments, responses: {'200': {$ref: '#/components/responses/Ok'}}}
+    post: {tags: [Assessment], operationId: createAssessment, requestBody: {$ref: '#/components/requestBodies/JsonBody'}, responses: {'201': {$ref: '#/components/responses/Created'}}}
+  /assessments/{assessmentId}:
+    get: {tags: [Assessment], operationId: getAssessment, parameters: [{$ref: '#/components/parameters/AssessmentId'}], responses: {'200': {$ref: '#/components/responses/Ok'}}}
+    patch: {tags: [Assessment], operationId: updateAssessment, parameters: [{$ref: '#/components/parameters/AssessmentId'}], requestBody: {$ref: '#/components/requestBodies/JsonBody'}, responses: {'200': {$ref: '#/components/responses/Ok'}}}
+  /assessments/{assessmentId}/publish:
+    post: {tags: [Assessment], operationId: publishAssessment, parameters: [{$ref: '#/components/parameters/AssessmentId'}], responses: {'200': {$ref: '#/components/responses/Ok'}, '409': {$ref: '#/components/responses/Error'}}}
+  /assessments/{assessmentId}/close:
+    post: {tags: [Assessment], operationId: closeAssessment, parameters: [{$ref: '#/components/parameters/AssessmentId'}], responses: {'200': {$ref: '#/components/responses/Ok'}}}
+  /assessments/{assessmentId}/attempts:
+    post: {tags: [Assessment], operationId: startAttempt, parameters: [{$ref: '#/components/parameters/AssessmentId'}, {$ref: '#/components/parameters/IdempotencyKey'}], responses: {'201': {$ref: '#/components/responses/Created'}, '403': {$ref: '#/components/responses/Error'}, '409': {$ref: '#/components/responses/Error'}}}
+  /attempts/{attemptId}:
+    get: {tags: [Assessment], operationId: getAttempt, parameters: [{$ref: '#/components/parameters/AttemptId'}], responses: {'200': {$ref: '#/components/responses/Ok'}, '403': {$ref: '#/components/responses/Error'}}}
+  /attempts/{attemptId}/answers/{questionSnapshotId}:
+    put: {tags: [Assessment], operationId: saveAttemptAnswer, parameters: [{$ref: '#/components/parameters/AttemptId'}, {$ref: '#/components/parameters/QuestionSnapshotId'}], requestBody: {$ref: '#/components/requestBodies/JsonBody'}, responses: {'200': {$ref: '#/components/responses/Ok'}, '409': {$ref: '#/components/responses/Error'}}}
+  /attempts/{attemptId}/submit:
+    post: {tags: [Assessment], operationId: submitAttempt, parameters: [{$ref: '#/components/parameters/AttemptId'}, {$ref: '#/components/parameters/IdempotencyKey'}], responses: {'200': {$ref: '#/components/responses/Ok'}, '409': {$ref: '#/components/responses/Error'}}}
+  /attempts/{attemptId}/result:
+    get: {tags: [Assessment], operationId: getAttemptResult, parameters: [{$ref: '#/components/parameters/AttemptId'}], responses: {'200': {$ref: '#/components/responses/Ok'}, '403': {$ref: '#/components/responses/Error'}}}
+  /assessments/{assessmentId}/retake-requests:
+    post: {tags: [Assessment], operationId: requestRetake, parameters: [{$ref: '#/components/parameters/AssessmentId'}, {$ref: '#/components/parameters/IdempotencyKey'}], responses: {'201': {$ref: '#/components/responses/Created'}}}
+  /retake-requests/{requestId}/approve:
+    post: {tags: [Assessment], operationId: approveRetake, parameters: [{$ref: '#/components/parameters/RequestId'}, {$ref: '#/components/parameters/IdempotencyKey'}], responses: {'200': {$ref: '#/components/responses/Ok'}}}
+  /retake-requests/{requestId}/reject:
+    post: {tags: [Assessment], operationId: rejectRetake, parameters: [{$ref: '#/components/parameters/RequestId'}], responses: {'200': {$ref: '#/components/responses/Ok'}}}
+  /learner/certificates:
+    get: {tags: [Certification], operationId: listMyCertificates, responses: {'200': {$ref: '#/components/responses/Ok'}}}
+  /certificates/{certificateId}:
+    get: {tags: [Certification], operationId: getCertificate, parameters: [{$ref: '#/components/parameters/CertificateId'}], responses: {'200': {$ref: '#/components/responses/Ok'}}}
+  /certificates/verify/{verificationCode}:
+    get: {tags: [Certification], operationId: verifyCertificate, security: [], parameters: [{$ref: '#/components/parameters/VerificationCode'}], responses: {'200': {$ref: '#/components/responses/Ok'}, '404': {$ref: '#/components/responses/Error'}}}
+  /certificates/{certificateId}/revoke:
+    post: {tags: [Certification], operationId: revokeCertificate, parameters: [{$ref: '#/components/parameters/CertificateId'}], responses: {'200': {$ref: '#/components/responses/Ok'}, '403': {$ref: '#/components/responses/Error'}}}
+  /ai/content-intelligence/jobs:
+    post: {tags: [AI], operationId: createContentIntelligenceJob, parameters: [{$ref: '#/components/parameters/IdempotencyKey'}], requestBody: {$ref: '#/components/requestBodies/JsonBody'}, responses: {'202': {$ref: '#/components/responses/Accepted'}}}
+  /ai/question-generation/jobs:
+    post: {tags: [AI], operationId: createQuestionGenerationJob, parameters: [{$ref: '#/components/parameters/IdempotencyKey'}], requestBody: {$ref: '#/components/requestBodies/JsonBody'}, responses: {'202': {$ref: '#/components/responses/Accepted'}}}
+  /ai/jobs/{jobId}:
+    get: {tags: [AI], operationId: getAIJob, parameters: [{$ref: '#/components/parameters/JobId'}], responses: {'200': {$ref: '#/components/responses/Ok'}}}
+  /ai/review-queue:
+    get: {tags: [AI], operationId: listAIReviewQueue, responses: {'200': {$ref: '#/components/responses/Ok'}}}
+  /ai/reviews/{reviewId}:
+    get: {tags: [AI], operationId: getAIReview, parameters: [{$ref: '#/components/parameters/ReviewId'}], responses: {'200': {$ref: '#/components/responses/Ok'}}}
+  /ai/reviews/{reviewId}/approve:
+    post: {tags: [AI], operationId: approveAIReview, parameters: [{$ref: '#/components/parameters/ReviewId'}], responses: {'200': {$ref: '#/components/responses/Ok'}}}
+  /ai/reviews/{reviewId}/reject:
+    post: {tags: [AI], operationId: rejectAIReview, parameters: [{$ref: '#/components/parameters/ReviewId'}], responses: {'200': {$ref: '#/components/responses/Ok'}}}
+  /ai/reviews/{reviewId}/final-content:
+    patch: {tags: [AI], operationId: updateAIFinalContent, parameters: [{$ref: '#/components/parameters/ReviewId'}], requestBody: {$ref: '#/components/requestBodies/JsonBody'}, responses: {'200': {$ref: '#/components/responses/Ok'}}}
+  /ai/usage:
+    get: {tags: [AI], operationId: getAIUsage, responses: {'200': {$ref: '#/components/responses/Ok'}}}
+  /analytics/overview:
+    get: {tags: [Analytics], operationId: getAnalyticsOverview, responses: {'200': {$ref: '#/components/responses/Ok'}}}
+  /analytics/trainings/{trainingId}:
+    get: {tags: [Analytics], operationId: getTrainingAnalytics, parameters: [{$ref: '#/components/parameters/TrainingId'}], responses: {'200': {$ref: '#/components/responses/Ok'}}}
+  /analytics/assessments/{assessmentId}:
+    get: {tags: [Analytics], operationId: getAssessmentAnalytics, parameters: [{$ref: '#/components/parameters/AssessmentId'}], responses: {'200': {$ref: '#/components/responses/Ok'}}}
+  /learner/insights:
+    get: {tags: [Analytics], operationId: getMyLearningInsights, responses: {'200': {$ref: '#/components/responses/Ok'}}}
+  /notifications:
+    get: {tags: [Notification], operationId: listNotifications, responses: {'200': {$ref: '#/components/responses/Ok'}}}
+  /notifications/read:
+    post: {tags: [Notification], operationId: markNotificationsRead, requestBody: {$ref: '#/components/requestBodies/JsonBody'}, responses: {'200': {$ref: '#/components/responses/Ok'}}}
+  /audit/events:
+    get: {tags: [Audit], operationId: listAuditEvents, responses: {'200': {$ref: '#/components/responses/Ok'}, '403': {$ref: '#/components/responses/Error'}}}
+components:
+  securitySchemes:
+    bearerAuth: {type: http, scheme: bearer, bearerFormat: JWT}
+  parameters:
+    IdempotencyKey: {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 8, maxLength: 200}}
+    UserId: {$ref: '#/components/parameters/OpaquePathId'}
+    TrainingId: {$ref: '#/components/parameters/OpaquePathId'}
+    TrainingVersionId: {$ref: '#/components/parameters/OpaquePathId'}
+    ObjectiveId: {$ref: '#/components/parameters/OpaquePathId'}
+    ContentId: {$ref: '#/components/parameters/OpaquePathId'}
+    ModuleId: {$ref: '#/components/parameters/OpaquePathId'}
+    VideoId: {$ref: '#/components/parameters/OpaquePathId'}
+    QuestionId: {$ref: '#/components/parameters/OpaquePathId'}
+    AssessmentId: {$ref: '#/components/parameters/OpaquePathId'}
+    AttemptId: {$ref: '#/components/parameters/OpaquePathId'}
+    QuestionSnapshotId: {$ref: '#/components/parameters/OpaquePathId'}
+    RequestId: {$ref: '#/components/parameters/OpaquePathId'}
+    CertificateId: {$ref: '#/components/parameters/OpaquePathId'}
+    JobId: {$ref: '#/components/parameters/OpaquePathId'}
+    ReviewId: {$ref: '#/components/parameters/OpaquePathId'}
+    VerificationCode: {name: verificationCode, in: path, required: true, schema: {type: string, minLength: 12}}
+    OpaquePathId: {name: id, in: path, required: true, schema: {type: string, minLength: 8}}
+  schemas:
+    JsonObject: {type: object, additionalProperties: true}
+    Error:
+      type: object
+      required: [code, message, correlationId]
+      properties:
+        code: {type: string}
+        message: {type: string}
+        correlationId: {type: string}
+        details: {type: object, additionalProperties: true}
+  requestBodies:
+    JsonBody:
+      required: true
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/JsonObject'}
+  responses:
+    Ok: {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/JsonObject'}}}}
+    Created: {description: Created, content: {application/json: {schema: {$ref: '#/components/schemas/JsonObject'}}}}
+    Accepted: {description: Accepted, content: {application/json: {schema: {$ref: '#/components/schemas/JsonObject'}}}}
+    Error: {description: Error, content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
