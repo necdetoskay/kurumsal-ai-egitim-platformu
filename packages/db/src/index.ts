@@ -18,3 +18,4 @@ export function createDatabase(databaseUrl: string) {
 }
 
 export type DatabaseClient = ReturnType<typeof createDatabase>;
+export * from './tenant-scope.js';
