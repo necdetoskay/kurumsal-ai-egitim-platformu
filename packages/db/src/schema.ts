@@ -91,3 +91,4 @@ export const auditEvents = pgTable('audit_events', {
 export * from './training-schema.js';
 export * from './assessment-schema.js';
 export * from './learning-schema.js';
+export * from './ingestion-schema.js';
