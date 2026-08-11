@@ -87,3 +87,5 @@ export const auditEvents = pgTable('audit_events', {
   tenantOccurredIdx: index('audit_events_tenant_occurred_idx').on(table.tenantId, table.occurredAt),
   actorIdx: index('audit_events_actor_idx').on(table.actorUserId, table.occurredAt),
 }));
+
+export * from './training-schema.js';
