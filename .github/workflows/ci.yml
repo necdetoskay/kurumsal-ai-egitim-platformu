@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  foundation:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: kaep
+          POSTGRES_PASSWORD: kaep
+          POSTGRES_DB: kaep
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U kaep -d kaep"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://kaep:kaep@localhost:5432/kaep
+      REDIS_URL: redis://localhost:6379
+      LOG_LEVEL: silent
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+      - run: pnpm db:generate
+      - run: pnpm db:migrate
+      - name: Readiness smoke
+        run: |
+          pnpm --filter @kaep/api dev > /tmp/kaep-api.log 2>&1 &
+          API_PID=$!
+          trap 'kill $API_PID || true' EXIT
+          for i in {1..20}; do
+            if curl --fail --silent http://127.0.0.1:3000/readyz | grep -q '"status":"ready"'; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/kaep-api.log
+          exit 1
