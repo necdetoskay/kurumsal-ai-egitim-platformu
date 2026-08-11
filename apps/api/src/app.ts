@@ -1,5 +1,5 @@
 import Fastify from 'fastify';
-import Redis from 'ioredis';
+import { Redis } from 'ioredis';
 import { createDatabase } from '@kaep/db';
 import type { AppConfig } from '@kaep/config';
 
