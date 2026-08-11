@@ -105,3 +105,5 @@ export function authorize(request: AuthorizationRequest): boolean {
 
   return true;
 }
+
+export * from './tenant-context.js';
