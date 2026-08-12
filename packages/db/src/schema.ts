@@ -95,3 +95,4 @@ export * from './ingestion-schema.js';
 export * from './ai-runtime-schema.js';
 export * from './agent-runtime-schema.js';
 export * from './authoring-schema.js';
+export * from './question-quality-schema.js';
