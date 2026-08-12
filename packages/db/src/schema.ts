@@ -94,3 +94,4 @@ export * from './learning-schema.js';
 export * from './ingestion-schema.js';
 export * from './ai-runtime-schema.js';
 export * from './agent-runtime-schema.js';
+export * from './authoring-schema.js';
