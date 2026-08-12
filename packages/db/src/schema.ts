@@ -92,3 +92,4 @@ export * from './training-schema.js';
 export * from './assessment-schema.js';
 export * from './learning-schema.js';
 export * from './ingestion-schema.js';
+export * from './ai-runtime-schema.js';
