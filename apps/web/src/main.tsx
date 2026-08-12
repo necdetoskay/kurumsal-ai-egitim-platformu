@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { canRenderProtectedShell, sessionMessage, type SessionState, type SessionStatus } from './auth';
 import { navForRole, type WebRole } from './navigation';
 import { defaultScreenFor, screenFor, type ScreenDefinition } from './screens';
 import './styles.css';
@@ -12,6 +13,30 @@ const roleLabels: Record<WebRole, string> = {
   reviewer: 'Reviewer',
   learner: 'Learner',
 };
+
+const sessionOptions: SessionStatus[] = ['authenticated', 'bootstrapping', 'unauthenticated', 'verification-required', 'expired', 'forbidden', 'maintenance'];
+
+function demoSession(status: SessionStatus, role: WebRole): SessionState {
+  if (status === 'authenticated') {
+    return { status, userId: 'demo-user', tenantId: 'demo-tenant', role, expiresAt: '2026-08-12T12:00:00.000Z' };
+  }
+  if (status === 'verification-required') return { status, challenge: 'mfa' };
+  return { status };
+}
+
+function SessionPanel({ session, onLogin }: { session: Exclude<SessionState, { status: 'authenticated' }>; onLogin: () => void }) {
+  const copy = sessionMessage(session);
+  const loginAllowed = session.status === 'unauthenticated' || session.status === 'expired';
+  return <main id="main-content" className="auth-stage">
+    <section className="auth-card" aria-live="polite">
+      <span className="eyebrow">Authentication & Session</span>
+      <h1>{copy.title}</h1>
+      <p>{copy.detail}</p>
+      {session.status === 'verification-required' && <div className="verification-box"><strong>MFA</strong><span>Doğrulama kodu bekleniyor.</span></div>}
+      {loginAllowed && <button type="button" className="primary-button" onClick={onLogin}>Giriş yap</button>}
+    </section>
+  </main>;
+}
 
 function StatePanel({ state }: { state: Exclude<ViewState, 'success'> }) {
   const copy = {
@@ -42,19 +67,34 @@ function WorkflowScreen({ screen, role }: { screen: ScreenDefinition; role: WebR
 function App() {
   const [role, setRole] = useState<WebRole>('learner');
   const [viewState, setViewState] = useState<ViewState>('success');
+  const [session, setSession] = useState<SessionState>(demoSession('authenticated', 'learner'));
   const [href, setHref] = useState(defaultScreenFor('learner').href);
-  const nav = navForRole(role);
-  const currentScreen = screenFor(role, href) ?? defaultScreenFor(role);
+  const effectiveRole = canRenderProtectedShell(session) ? session.role : role;
+  const nav = navForRole(effectiveRole);
+  const currentScreen = screenFor(effectiveRole, href) ?? defaultScreenFor(effectiveRole);
 
   function changeRole(nextRole: WebRole) {
     setRole(nextRole);
     setHref(defaultScreenFor(nextRole).href);
     setViewState('success');
+    if (session.status === 'authenticated') setSession(demoSession('authenticated', nextRole));
+  }
+
+  function changeSession(nextStatus: SessionStatus) {
+    setSession(demoSession(nextStatus, role));
   }
 
   function navigate(nextHref: string) {
-    setHref(screenFor(role, nextHref)?.href ?? defaultScreenFor(role).href);
+    setHref(screenFor(effectiveRole, nextHref)?.href ?? defaultScreenFor(effectiveRole).href);
     setViewState('success');
+  }
+
+  if (!canRenderProtectedShell(session)) {
+    return <div className="public-shell">
+      <a className="skip-link" href="#main-content">İçeriğe geç</a>
+      <header className="public-topbar"><div className="brand"><span className="brand-mark">K</span><div><strong>KAEP</strong><small>Kurumsal Eğitim</small></div></div><label>Oturum durumu<select value={session.status} onChange={(event) => changeSession(event.target.value as SessionStatus)}>{sessionOptions.map((item) => <option key={item}>{item}</option>)}</select></label></header>
+      <SessionPanel session={session} onLogin={() => setSession(demoSession('authenticated', role))} />
+    </div>;
   }
 
   return <div className="app-shell">
@@ -65,8 +105,8 @@ function App() {
       <div className="role-box"><label htmlFor="role">Demo rolü</label><select id="role" value={role} onChange={(event) => changeRole(event.target.value as WebRole)}>{(Object.keys(roleLabels) as WebRole[]).map((item) => <option key={item} value={item}>{roleLabels[item]}</option>)}</select></div>
     </aside>
     <div className="workspace">
-      <header className="topbar"><strong>{roleLabels[role]}</strong><div className="state-switcher" aria-label="UI state preview"><label htmlFor="state">Durum</label><select id="state" value={viewState} onChange={(event) => setViewState(event.target.value as ViewState)}><option value="success">Success</option><option value="loading">Loading</option><option value="empty">Empty</option><option value="error">Error</option><option value="forbidden">403</option><option value="not-found">404</option></select></div></header>
-      <main id="main-content">{viewState === 'success' ? <WorkflowScreen screen={currentScreen} role={role} /> : <StatePanel state={viewState} />}</main>
+      <header className="topbar"><strong>{roleLabels[effectiveRole]}</strong><div className="state-switcher"><label htmlFor="session">Oturum</label><select id="session" value={session.status} onChange={(event) => changeSession(event.target.value as SessionStatus)}>{sessionOptions.map((item) => <option key={item}>{item}</option>)}</select><label htmlFor="state">Durum</label><select id="state" value={viewState} onChange={(event) => setViewState(event.target.value as ViewState)}><option value="success">Success</option><option value="loading">Loading</option><option value="empty">Empty</option><option value="error">Error</option><option value="forbidden">403</option><option value="not-found">404</option></select><button type="button" className="link-button" onClick={() => setSession({ status: 'unauthenticated' })}>Çıkış</button></div></header>
+      <main id="main-content">{viewState === 'success' ? <WorkflowScreen screen={currentScreen} role={effectiveRole} /> : <StatePanel state={viewState} />}</main>
       <nav className="mobile-nav" aria-label="Mobil navigasyon">{nav.slice(0, 4).map((item) => <a href={item.href} key={item.href} onClick={(event) => { event.preventDefault(); navigate(item.href); }}>{item.label}</a>)}</nav>
     </div>
   </div>;
