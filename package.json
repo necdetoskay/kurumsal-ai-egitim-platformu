@@ -10,6 +10,7 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "dev:api": "pnpm --filter @kaep/api dev",
+    "dev:web": "pnpm --filter @kaep/web dev",
     "db:generate": "pnpm --filter @kaep/db db:generate",
     "db:migrate": "pnpm --filter @kaep/db db:migrate"
   }
