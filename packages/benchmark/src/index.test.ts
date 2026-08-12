@@ -8,7 +8,8 @@ const baseCase: GoldenCase = {
 };
 
 test('judge-assisted ground truth requires review', () => {
-  assert.throws(() => validateGoldenCase({ ...baseCase, groundTruthSource: 'judge_assisted', approvedBy: undefined }), /JUDGE_GROUND_TRUTH_REQUIRES_REVIEW/);
+  const { approvedBy: _approvedBy, ...withoutApproval } = baseCase;
+  assert.throws(() => validateGoldenCase({ ...withoutApproval, groundTruthSource: 'judge_assisted' }), /JUDGE_GROUND_TRUTH_REQUIRES_REVIEW/);
 });
 
 test('run cannot evaluate cases outside recorded dataset split', () => {
