@@ -1,4 +1,5 @@
 import React from 'react';
+import './assessment-ui.css';
 
 export type QuestionReviewState = 'draft' | 'ai-proposal' | 'approved' | 'rejected';
 export type AssessmentPublishState = 'draft' | 'ready' | 'published';
