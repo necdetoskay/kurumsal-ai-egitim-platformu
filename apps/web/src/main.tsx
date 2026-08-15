@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { canRenderProtectedShell, sessionMessage, type SessionState, type SessionStatus } from './auth';
 import { InstructorAuthoringWorkspace } from './authoring-ui';
+import { QuestionAssessmentWorkspace } from './assessment-ui';
 import { navForRole, type WebRole } from './navigation';
 import { defaultScreenFor, screenFor, type ScreenDefinition } from './screens';
 import './styles.css';
@@ -52,6 +53,7 @@ function StatePanel({ state }: { state: Exclude<ViewState, 'success'> }) {
 
 function WorkflowScreen({ screen, role }: { screen: ScreenDefinition; role: WebRole }) {
   if (role === 'instructor' && screen.href === '/instructor/trainings') return <InstructorAuthoringWorkspace />;
+  if (role === 'instructor' && (screen.href === '/instructor/questions' || screen.href === '/instructor/assessments')) return <QuestionAssessmentWorkspace />;
   const learner = role === 'learner';
   return <>
     <header className="page-header">
