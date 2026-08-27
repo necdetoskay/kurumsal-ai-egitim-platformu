@@ -4,7 +4,7 @@
 **Onay tarihi:** 2026-08-27  
 **Modül:** Organizasyon Yönetimi / Gruplar Yönetimi  
 **VCE sürümü:** 1.0  
-**Görsel referans:** `../../../ui-mockups/vce/VCE-OM-GROUPS-001.jpg`  
+**Görsel referans:** `../../../ui-mockups/vce/VCE-OM-GROUPS-001.svg`  
 **Görsel etiketi:** `VCE-OM-05`  
 **Kaynak render gen_id:** `d70cc044-978d-44b6-abf5-30029acb9f43`
 
