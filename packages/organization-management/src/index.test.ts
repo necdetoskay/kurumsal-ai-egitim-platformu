@@ -49,7 +49,7 @@ function fixture() {
 }
 
 async function expectCode(promise: Promise<unknown>, code: string) {
-  await expect(promise).rejects.toMatchObject<Partial<OrganizationInvariantError>>({ code });
+  await expect(promise).rejects.toMatchObject({ code } as Partial<OrganizationInvariantError>);
 }
 
 describe('OrganizationLifecycleService', () => {
