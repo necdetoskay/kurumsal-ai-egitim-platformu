@@ -2,9 +2,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { OperationsAdminApi, assertNoTenantOverride, type OperationsAdminHttpClient } from './operations-admin-api.js';
 
 function client() {
-  const get = vi.fn(async <T,>(_path: string) => ({} as T));
-  const post = vi.fn(async <T,>(_path: string, _body?: unknown) => ({} as T));
-  return { http: { get, post } satisfies OperationsAdminHttpClient, get, post };
+  const get = vi.fn();
+  const post = vi.fn();
+  const http: OperationsAdminHttpClient = {
+    async get<T>(path: string): Promise<T> { get(path); return {} as T; },
+    async post<T>(path: string, body?: unknown): Promise<T> { post(path, body); return {} as T; },
+  };
+  return { http, get, post };
 }
 
 describe('OperationsAdminApi', () => {
