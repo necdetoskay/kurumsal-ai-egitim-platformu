@@ -9,6 +9,7 @@ import {
   pgTable,
   text,
   timestamp,
+  unique,
   uniqueIndex,
   uuid,
   varchar,
@@ -44,7 +45,7 @@ export const organizations = pgTable(
   },
   (table) => ({
     tenantCodeUq: uniqueIndex('organizations_tenant_code_uq').on(table.tenantId, table.code),
-    tenantIdIdUq: uniqueIndex('organizations_tenant_id_id_uq').on(table.tenantId, table.id),
+    tenantIdIdUq: unique('organizations_tenant_id_id_uq').on(table.tenantId, table.id),
     tenantStatusIdx: index('organizations_tenant_status_idx').on(table.tenantId, table.status),
     tenantNameIdx: index('organizations_tenant_name_idx').on(table.tenantId, sql`lower(${table.name})`),
   }),
@@ -78,12 +79,12 @@ export const companies = pgTable(
       table.organizationId,
       table.code,
     ),
-    tenantOrgIdUq: uniqueIndex('companies_tenant_org_id_uq').on(
+    tenantOrgIdUq: unique('companies_tenant_org_id_uq').on(
       table.tenantId,
       table.organizationId,
       table.id,
     ),
-    tenantIdIdUq: uniqueIndex('companies_tenant_id_id_uq').on(table.tenantId, table.id),
+    tenantIdIdUq: unique('companies_tenant_id_id_uq').on(table.tenantId, table.id),
     tenantOrgStatusIdx: index('companies_tenant_org_status_idx').on(
       table.tenantId,
       table.organizationId,
@@ -124,12 +125,15 @@ export const departments = pgTable(
       table.companyId,
       table.code,
     ),
-    tenantCompanyIdUq: uniqueIndex('departments_tenant_company_id_uq').on(
+    tenantCompanyIdUq: unique('departments_tenant_company_id_uq').on(
       table.tenantId,
       table.companyId,
       table.id,
     ),
-    parentNotSelf: check('departments_parent_not_self_ck', sql`${table.parentDepartmentId} is null or ${table.parentDepartmentId} <> ${table.id}`),
+    parentNotSelf: check(
+      'departments_parent_not_self_ck',
+      sql`${table.parentDepartmentId} is null or ${table.parentDepartmentId} <> ${table.id}`,
+    ),
     hierarchyIdx: index('departments_hierarchy_idx').on(
       table.tenantId,
       table.companyId,
