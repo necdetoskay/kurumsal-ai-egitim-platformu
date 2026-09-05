@@ -10,6 +10,7 @@ const roleNavigation: Record<WebRole, readonly NavItem[]> = {
   tenant_admin: [
     { label: 'Genel Bakış', href: '/admin', inventory: [9] },
     { label: 'Organizasyon', href: '/admin/organization', inventory: [65, 66, 67, 68] },
+    { label: 'Personel', href: '/admin/organization/personnel', inventory: [69, 70, 71] },
     { label: 'Kullanıcılar', href: '/admin/users', inventory: [10, 11, 12, 13, 14] },
     { label: 'Eğitimler', href: '/admin/trainings', inventory: [15, 16] },
     { label: 'Değerlendirmeler', href: '/admin/assessments', inventory: [17, 18] },
