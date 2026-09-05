@@ -1,16 +1,13 @@
 export type WebRole = 'tenant_admin' | 'instructor' | 'reviewer' | 'learner';
 
-export interface NavItem {
-  label: string;
-  href: string;
-  inventory: readonly number[];
-}
+export interface NavItem { label: string; href: string; inventory: readonly number[]; }
 
 const roleNavigation: Record<WebRole, readonly NavItem[]> = {
   tenant_admin: [
     { label: 'Genel Bakış', href: '/admin', inventory: [9] },
     { label: 'Organizasyon', href: '/admin/organization', inventory: [65, 66, 67, 68] },
     { label: 'Personel', href: '/admin/organization/personnel', inventory: [69, 70, 71] },
+    { label: 'Gruplar ve Dizin', href: '/admin/organization/directory', inventory: [72, 73, 74, 75] },
     { label: 'Kullanıcılar', href: '/admin/users', inventory: [10, 11, 12, 13, 14] },
     { label: 'Eğitimler', href: '/admin/trainings', inventory: [15, 16] },
     { label: 'Değerlendirmeler', href: '/admin/assessments', inventory: [17, 18] },
@@ -40,6 +37,4 @@ const roleNavigation: Record<WebRole, readonly NavItem[]> = {
   ],
 };
 
-export function navForRole(role: WebRole): readonly NavItem[] {
-  return roleNavigation[role];
-}
+export function navForRole(role: WebRole): readonly NavItem[] { return roleNavigation[role]; }

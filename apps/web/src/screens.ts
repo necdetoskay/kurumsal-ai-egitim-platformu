@@ -2,17 +2,7 @@ import type { WebRole } from './navigation';
 
 export type ScreenState = 'ready' | 'loading' | 'empty' | 'error' | 'forbidden' | 'not-found';
 export type WorkflowTone = 'neutral' | 'info' | 'warning' | 'success';
-
-export interface ScreenDefinition {
-  id: number;
-  href: string;
-  roles: readonly WebRole[];
-  title: string;
-  description: string;
-  workflowStates: readonly string[];
-  tone?: WorkflowTone;
-  learnerSafe?: boolean;
-}
+export interface ScreenDefinition { id: number; href: string; roles: readonly WebRole[]; title: string; description: string; workflowStates: readonly string[]; tone?: WorkflowTone; learnerSafe?: boolean; }
 
 export const screens: readonly ScreenDefinition[] = [
   { id: 9, href: '/admin', roles: ['tenant_admin'], title: 'Yönetim Paneli', description: 'Organizasyon, eğitim ve operasyon özetleri.', workflowStates: ['active'], tone: 'info' },
@@ -23,6 +13,10 @@ export const screens: readonly ScreenDefinition[] = [
   { id: 69, href: '/admin/organization/personnel', roles: ['tenant_admin'], title: 'Personel Yönetimi', description: 'Personel kayıtlarını arayın, filtreleyin ve yaşam döngüsünü yönetin.', workflowStates: ['ready', 'loading', 'empty', 'error', 'forbidden'] },
   { id: 70, href: '/admin/organization/personnel/detail', roles: ['tenant_admin'], title: 'Personel Detayı', description: 'Personel, kullanıcı hesabı, mevcut atama ve istihdam geçmişini ayrı görüntüleyin.', workflowStates: ['ready', 'passive', 'terminated', 'not-linked', 'forbidden'] },
   { id: 71, href: '/admin/organization/personnel/transfer', roles: ['tenant_admin'], title: 'Atama Değişikliği', description: 'Mevcut employment kaydını kapatıp yeni atamayı etkin tarihle başlatın.', workflowStates: ['editing', 'scope-invalid', 'saving', 'completed', 'conflict'] },
+  { id: 72, href: '/admin/organization/directory', roles: ['tenant_admin'], title: 'Grup Yönetimi', description: 'Manuel, dinamik ve sistem gruplarını sahiplik sınırlarıyla yönetin.', workflowStates: ['ready', 'loading', 'empty', 'error', 'forbidden'] },
+  { id: 73, href: '/admin/organization/directory/group-detail', roles: ['tenant_admin'], title: 'Grup Detayı', description: 'Üyelik geçmişini ve grup sahiplik kurallarını görüntüleyin.', workflowStates: ['manual-editable', 'dynamic-readonly', 'system-readonly', 'forbidden'] },
+  { id: 74, href: '/admin/organization/directory/positions', roles: ['tenant_admin'], title: 'Pozisyon Yönetimi', description: 'Pozisyonları oluşturun, düzenleyin ve yaşam döngüsünü yönetin.', workflowStates: ['ready', 'empty', 'passivated', 'reactivated'] },
+  { id: 75, href: '/admin/organization/directory/locations', roles: ['tenant_admin'], title: 'Lokasyon Yönetimi', description: 'Lokasyonları oluşturun, düzenleyin ve yaşam döngüsünü yönetin.', workflowStates: ['ready', 'empty', 'passivated', 'reactivated'] },
   { id: 23, href: '/instructor/trainings', roles: ['instructor'], title: 'Eğitimler', description: 'Taslak, inceleme ve yayın durumundaki eğitimleri yönetin.', workflowStates: ['draft', 'in-review', 'changes-requested', 'published', 'archived'] },
   { id: 24, href: '/instructor/trainings/new', roles: ['instructor'], title: 'Yeni Eğitim', description: 'Yeni training draft oluşturun.', workflowStates: ['draft', 'validation-error'] },
   { id: 25, href: '/instructor/trainings/editor', roles: ['instructor'], title: 'Eğitim Editörü', description: 'Training metadata ve içerik yapısını düzenleyin.', workflowStates: ['editing', 'saving', 'saved', 'save-failed'] },
@@ -44,18 +38,6 @@ export const screens: readonly ScreenDefinition[] = [
   { id: 62, href: '/learn/insights', roles: ['learner'], title: 'Öğrenme İçgörüleri', description: 'Yeterli evidence bulunduğunda öğrenme alanları hakkında güvenli içgörüler.', workflowStates: ['available', 'low-confidence', 'insufficient-evidence'], learnerSafe: true },
 ] as const;
 
-export function screenFor(role: WebRole, href: string): ScreenDefinition | null {
-  return screens.find((screen) => screen.href === href && screen.roles.includes(role)) ?? null;
-}
-
-export function defaultScreenFor(role: WebRole): ScreenDefinition {
-  const href = role === 'learner' ? '/learn' : role === 'reviewer' ? '/reviewer/queue' : role === 'instructor' ? '/instructor/trainings' : '/admin';
-  const screen = screenFor(role, href);
-  if (!screen) throw new Error('DEFAULT_SCREEN_MISSING');
-  return screen;
-}
-
-export function learnerProjectionContract(screen: ScreenDefinition): { exposesAnswerKey: false; serverAuthoritative: true } | null {
-  if (!screen.learnerSafe) return null;
-  return { exposesAnswerKey: false, serverAuthoritative: true };
-}
+export function screenFor(role: WebRole, href: string): ScreenDefinition | null { return screens.find((screen) => screen.href === href && screen.roles.includes(role)) ?? null; }
+export function defaultScreenFor(role: WebRole): ScreenDefinition { const href = role === 'learner' ? '/learn' : role === 'reviewer' ? '/reviewer/queue' : role === 'instructor' ? '/instructor/trainings' : '/admin'; const screen = screenFor(role, href); if (!screen) throw new Error('DEFAULT_SCREEN_MISSING'); return screen; }
+export function learnerProjectionContract(screen: ScreenDefinition): { exposesAnswerKey: false; serverAuthoritative: true } | null { if (!screen.learnerSafe) return null; return { exposesAnswerKey: false, serverAuthoritative: true }; }
