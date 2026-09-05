@@ -118,3 +118,4 @@ export function errorEnvelope(code: string, correlationId: string, details?: unk
 
 export * from './employee-employment.js';
 export * from './group-role.js';
+export * from './shared-gates.js';
