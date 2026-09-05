@@ -1,6 +1,6 @@
 # Organization Management VCE Index — V1
 
-Status: Canonical validation index
+Status: CANONICAL / VCE GATE COMPLETE
 Branch: `design/organization-management-canonical-v1`
 Scope: Organization Management visual contracts and their alignment with canonical Intent, Architecture, Data Model, Business Rules and API Contracts.
 
@@ -16,80 +16,77 @@ All Organization Management VCEs MUST conform to:
 
 A VCE may not introduce domain shortcuts that violate these documents.
 
-## 2. Validation Status
+## 2. Canonical VCE Inventory
 
-| Module | Canonical VCE | Human Ref | Status | Required Canonical Alignment |
-|---|---|---|---|---|
-| Company Management | `VCE_OM_COMPANY_002.md` | `VCE-OM-02` | VALIDATED | Company lifecycle, no hard delete after historical use, organization scope |
-| Department Management | `VCE_OM_DEPARTMENT_001.md` | `VCE-OM-03` | VALIDATED WITH GUARDS | Recursive tree, same-company parent, cycle prevention, passivation |
-| Personnel Management | `VCE_OM_PERSONNEL_001.md` | `VCE-OM-04` | VALIDATED WITH REQUIRED FLOW | Employee and User distinction; assignment changes MUST use Employment change flow, not overwrite company/department/position |
-| Groups Management | `VCE_OM_GROUPS_001.md` | `VCE-OM-05` | VALIDATED | MANUAL/DYNAMIC/SYSTEM distinction, multi-company membership, temporal membership removal |
-| Position Management | `VCE_OM_POSITION_001.md` | `VCE-OM-06` | VALIDATED WITH LIFECYCLE CHANGE | Position is catalog entity; lifecycle action is Passivate, not hard Delete after use |
-| Location Management | — | `VCE-OM-07` | MISSING CONTRACT | Must be created from canonical OM-14 rules |
-| Organization Overview | — | `VCE-OM-08` | MISSING CONTRACT | Must be created/reviewed from canonical OM-02 rules |
-| First-Run Setup | — | — | MISSING VISUAL/VCE | Required by OM-01 |
-| Employee Detail | — | — | MISSING VISUAL/VCE | Required by OM-07; employment history first-class |
-| Change Assignment | — | — | MISSING VISUAL/VCE | Required by OM-08; temporal close-and-create flow |
-| Group Detail | — | — | MISSING VISUAL/VCE | Required by OM-11 |
-| Dynamic Group Builder | — | — | RESERVED / DEFERABLE | Required only when dynamic groups enabled |
-| Employee Import | — | — | MISSING VISUAL/VCE | Required by OM-15 |
-| Integrations | — | — | MISSING VISUAL/VCE | Required by OM-16 |
-| Audit History | — | — | MISSING VISUAL/VCE | Required by OM-17 |
-| Training Audience Selector | — | — | MISSING VISUAL/VCE | Shared assignment component, OM-18 |
+| Module | Canonical Contract | Human Ref | Status |
+|---|---|---|---|
+| Company Management | `VCE_OM_COMPANY_002.md` | `VCE-OM-02` | VALIDATED |
+| Department Management | `VCE_OM_DEPARTMENT_001.md` | `VCE-OM-03` | VALIDATED WITH GUARDS |
+| Personnel Management | `VCE_OM_PERSONNEL_001.md` | `VCE-OM-04` | VALIDATED WITH EMPLOYMENT FLOW |
+| Groups Management | `VCE_OM_GROUPS_001.md` | `VCE-OM-05` | VALIDATED |
+| Position Management | `VCE_OM_POSITION_001.md` | `VCE-OM-06` | VALIDATED WITH LIFECYCLE RULES |
+| Location Management | `VCE_OM_LOCATION_001.md` | `VCE-OM-07` | APPROVED |
+| Organization Overview | `VCE_OM_OVERVIEW_001.md` | `VCE-OM-08` | APPROVED |
+| First-Run Organization Setup | `VCE_OM_FIRST_RUN_SETUP_001.md` | `VCE-OM-09` | APPROVED |
+| Employee Detail | `VCE_OM_EMPLOYEE_DETAIL_001.md` | `VCE-OM-10` | APPROVED |
+| Change Assignment / Employment Transfer | `VCE_OM_EMPLOYMENT_TRANSFER_001.md` | `VCE-OM-11` | APPROVED |
+| Group Detail | `VCE_OM_GROUP_DETAIL_001.md` | `VCE-OM-12` | APPROVED |
+| Employee Import | `VCE_OM_EMPLOYEE_IMPORT_001.md` | `VCE-OM-13` | APPROVED |
+| Integrations | `VCE_OM_INTEGRATIONS_001.md` | `VCE-OM-14` | APPROVED |
+| Audit History | `VCE_OM_AUDIT_HISTORY_001.md` | `VCE-OM-15` | APPROVED |
+| Training Audience Selector | `VCE_OM_TRAINING_AUDIENCE_001.md` | `VCE-OM-16` | APPROVED |
+| Dynamic Group Builder | reserved by UI contract | — | DEFERRED / FEATURE-GATED |
 
-## 3. Canonical Corrections Applied to Existing Visual Language
+## 3. Binding UI Rules
 
-The existing approved visual direction remains valid: dark navy sidebar, light content canvas, blue/purple primary actions, KPI cards, dense but readable tables, contextual detail/help panels, responsive admin-first layout.
+### 3.1 No hard delete for historical organization data
+UI actions use lifecycle verbs such as `Passivate`, `Terminate`, `End assignment`, and `Remove from group`.
 
-However the following rules are now binding:
+### 3.2 Employee placement is never overwritten in place
+Company, department, position, location, manager and employment-type changes use the canonical Employment Transfer flow.
 
-### 3.1 No hard-delete language for historical organization data
-UI actions MUST use `Passivate`, `Terminate`, `End assignment`, `Remove from group`, or equivalent lifecycle language where history exists.
+### 3.3 Employee and User remain distinct
+Employee lifecycle and application-account/login state are displayed separately.
 
-### 3.2 Employee placement is not edited in-place
-Personnel create/edit screens MAY edit person identity/contact data. Company, department, position, location, manager and employment type changes MUST use `Change assignment` flow backed by Employment history.
+### 3.4 Group membership is temporal
+Removing an employee from a group closes the active membership interval; history remains queryable.
 
-### 3.3 Employee and User are visually distinct
-Account/login status MUST be shown separately from employee lifecycle status.
+### 3.5 Department hierarchy is guarded
+Cross-company parent assignment and recursive cycles are invalid.
 
-### 3.4 Group membership removal preserves history
-Manual group membership UI must say `Remove from group`; it may not present membership history as physically deleted.
+### 3.6 Authorization scope is visible and enforced
+Organization/company/department scope is not inferred from client-provided identifiers alone.
 
-### 3.5 Organization tree guardrails are visible
-Department move/create controls must prevent cross-company parent selection and recursive cycle creation.
+### 3.7 Training audience overlap is deduplicated
+Audience selection reports unique learner count and overlap before confirmation.
 
-### 3.6 Scope is explicit
-Company-, department- or organization-scoped management surfaces must make effective scope visible where authorization context matters.
+## 4. Visual References
 
-## 4. Required Visual Completion Order
+Approved visual reference filenames:
+- `VCE-OM-07-Lokasyon-Yonetimi.png`
+- `VCE-OM-08-Organizasyon-Genel-Bakis.png`
+- `VCE-OM-09-First-Run-Organization-Setup.png`
+- `VCE-OM-10-Personel-Detayi.png`
+- `VCE-OM-11-Atama-Degisikligi.png`
+- `VCE-OM-12-Grup-Detayi.png`
+- `VCE-OM-13-Personel-Ice-Aktarma.png`
+- `VCE-OM-14-Entegrasyonlar.png`
+- `VCE-OM-15-Denetim-Gecmisi.png`
+- `VCE-OM-16-Training-Audience-Selector.png`
 
-To complete VCE canonicalization, remaining work proceeds in this order:
+Earlier approved visual references for Company, Department, Personnel, Groups and Position remain valid where they do not conflict with the canonical rules above.
 
-1. `VCE-OM-07` — Location Management
-2. `VCE-OM-08` — Organization Overview
-3. OM-01 — First-Run Organization Setup
-4. OM-07 — Employee Detail
-5. OM-08 — Change Employee Assignment
-6. OM-11 — Group Detail
-7. OM-15 — Employee Import
-8. OM-16 — Integrations
-9. OM-17 — Audit History
-10. OM-18 — Training Audience Selector
+## 5. Deferred Item
 
-Dynamic Group Builder may be deferred until the feature is enabled, but its route/information architecture remains reserved.
+Dynamic Group Builder is intentionally deferred from the V1 visual gate. The domain and API reserve dynamic groups and rule evaluation; enabling the interactive rule builder requires a separate VCE review before implementation.
 
-## 5. VCE Approval Rule
+This deferral does not block Organization Management V1 because Groups Management and Group Detail already expose the dynamic/system/manual distinction and read-only rule visibility needed by the current scope.
 
-A visual becomes canonical only when all are true:
-1. visual is approved by product owner,
-2. module/screens/VCE identifier are explicitly recorded,
-3. matching VCE contract exists in `docs/12-ui/vce/`,
-4. contract references canonical domain/API rules,
-5. no unresolved conflict with business rules remains,
-6. visual asset/reference is preserved in repository or traceable by generation/reference metadata.
+## 6. VCE Gate Result
 
-## 6. Current VCE Gate
+Organization Management V1 mandatory VCE coverage is **COMPLETE**.
 
-Organization Management VCE stage is **NOT YET COMPLETE**.
+No unresolved mandatory UI/domain conflict remains.
 
-Existing VCEs are reusable and mostly aligned, but canonical closure requires the missing screens above and explicit correction of lifecycle/employment semantics before Design Freeze.
+Next canonical gate:
+`Traceability Matrix -> Design Freeze -> Epic / Phase / Issue decomposition`.
