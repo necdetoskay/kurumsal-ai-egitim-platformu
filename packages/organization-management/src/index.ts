@@ -67,6 +67,18 @@ function ensureSameTenant(expectedTenantId: string, actualTenantId: string) {
   }
 }
 
+function withOptionalAuditFields(
+  base: Omit<AuditEventInput, 'actorUserId' | 'correlationId'>,
+  actorUserId?: string,
+  correlationId?: string,
+): AuditEventInput {
+  return {
+    ...base,
+    ...(actorUserId !== undefined ? { actorUserId } : {}),
+    ...(correlationId !== undefined ? { correlationId } : {}),
+  };
+}
+
 export class OrganizationLifecycleService {
   constructor(private readonly tx: TransactionManager) {}
 
@@ -83,16 +95,14 @@ export class OrganizationLifecycleService {
         throw new OrganizationInvariantError('ORGANIZATION_HAS_ACTIVE_COMPANIES', 'Organization has active companies.');
       }
       await repo.updateOrganizationStatus(organization.id, 'PASSIVE');
-      await repo.appendAudit({
+      await repo.appendAudit(withOptionalAuditFields({
         tenantId: input.tenantId,
-        actorUserId: input.actorUserId,
         action: 'ORGANIZATION_PASSIVATED',
         entityType: 'ORGANIZATION',
         entityId: organization.id,
         before: { status: organization.status },
         after: { status: 'PASSIVE' },
-        correlationId: input.correlationId,
-      });
+      }, input.actorUserId, input.correlationId));
     });
   }
 
@@ -105,16 +115,14 @@ export class OrganizationLifecycleService {
         throw new OrganizationInvariantError('COMPANY_HAS_ACTIVE_DEPARTMENTS', 'Company has active departments.');
       }
       await repo.updateCompanyStatus(company.id, 'PASSIVE');
-      await repo.appendAudit({
+      await repo.appendAudit(withOptionalAuditFields({
         tenantId: input.tenantId,
-        actorUserId: input.actorUserId,
         action: 'COMPANY_PASSIVATED',
         entityType: 'COMPANY',
         entityId: company.id,
         before: { status: company.status },
         after: { status: 'PASSIVE' },
-        correlationId: input.correlationId,
-      });
+      }, input.actorUserId, input.correlationId));
     });
   }
 
@@ -166,16 +174,14 @@ export class OrganizationLifecycleService {
 
       if (department.parentDepartmentId === input.newParentDepartmentId) return;
       await repo.updateDepartment({ id: department.id, parentDepartmentId: input.newParentDepartmentId });
-      await repo.appendAudit({
+      await repo.appendAudit(withOptionalAuditFields({
         tenantId: input.tenantId,
-        actorUserId: input.actorUserId,
         action: 'DEPARTMENT_MOVED',
         entityType: 'DEPARTMENT',
         entityId: department.id,
         before: { parentDepartmentId: department.parentDepartmentId },
         after: { parentDepartmentId: input.newParentDepartmentId },
-        correlationId: input.correlationId,
-      });
+      }, input.actorUserId, input.correlationId));
     });
   }
 
@@ -195,16 +201,14 @@ export class OrganizationLifecycleService {
         throw new OrganizationInvariantError('DEPARTMENT_HAS_ACTIVE_CHILDREN', 'Department has active child departments.');
       }
       await repo.updateDepartment({ id: department.id, status: 'PASSIVE' });
-      await repo.appendAudit({
+      await repo.appendAudit(withOptionalAuditFields({
         tenantId: input.tenantId,
-        actorUserId: input.actorUserId,
         action: 'DEPARTMENT_PASSIVATED',
         entityType: 'DEPARTMENT',
         entityId: department.id,
         before: { status: department.status },
         after: { status: 'PASSIVE' },
-        correlationId: input.correlationId,
-      });
+      }, input.actorUserId, input.correlationId));
     });
   }
 }
