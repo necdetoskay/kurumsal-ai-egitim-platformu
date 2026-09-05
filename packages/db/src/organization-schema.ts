@@ -178,6 +178,7 @@ export const positions = pgTable(
       table.organizationId,
       table.code,
     ),
+    tenantIdIdUq: unique('positions_tenant_id_id_uq').on(table.tenantId, table.id),
     tenantOrgStatusIdx: index('positions_tenant_org_status_idx').on(
       table.tenantId,
       table.organizationId,
@@ -225,6 +226,7 @@ export const locations = pgTable(
       table.organizationId,
       table.code,
     ),
+    tenantIdIdUq: unique('locations_tenant_id_id_uq').on(table.tenantId, table.id),
     tenantOrgStatusIdx: index('locations_tenant_org_status_idx').on(
       table.tenantId,
       table.organizationId,

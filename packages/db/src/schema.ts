@@ -89,6 +89,7 @@ export const auditEvents = pgTable('audit_events', {
 }));
 
 export * from './organization-schema.js';
+export * from './employee-schema.js';
 export * from './training-schema.js';
 export * from './assessment-schema.js';
 export * from './learning-schema.js';
