@@ -8,6 +8,7 @@ const roleNavigation: Record<WebRole, readonly NavItem[]> = {
     { label: 'Organizasyon', href: '/admin/organization', inventory: [65, 66, 67, 68] },
     { label: 'Personel', href: '/admin/organization/personnel', inventory: [69, 70, 71] },
     { label: 'Gruplar ve Dizin', href: '/admin/organization/directory', inventory: [72, 73, 74, 75] },
+    { label: 'Operasyonlar', href: '/admin/organization/operations', inventory: [76, 77, 78, 79] },
     { label: 'Kullanıcılar', href: '/admin/users', inventory: [10, 11, 12, 13, 14] },
     { label: 'Eğitimler', href: '/admin/trainings', inventory: [15, 16] },
     { label: 'Değerlendirmeler', href: '/admin/assessments', inventory: [17, 18] },
