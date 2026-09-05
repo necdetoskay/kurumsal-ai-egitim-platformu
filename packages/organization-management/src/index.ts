@@ -84,25 +84,12 @@ export class OrganizationLifecycleService {
 
   async passivateOrganization(input: { tenantId: string; organizationId: string; actorUserId?: string; correlationId?: string }) {
     return this.tx.transaction(async (repo) => {
-      const organization = requireRecord(
-        await repo.getOrganization(input.organizationId),
-        'ORGANIZATION_NOT_FOUND',
-        'Organization not found.',
-      );
+      const organization = requireRecord(await repo.getOrganization(input.organizationId), 'ORGANIZATION_NOT_FOUND', 'Organization not found.');
       ensureSameTenant(input.tenantId, organization.tenantId);
       if (organization.status === 'PASSIVE') return;
-      if ((await repo.countActiveCompanies(organization.id)) > 0) {
-        throw new OrganizationInvariantError('ORGANIZATION_HAS_ACTIVE_COMPANIES', 'Organization has active companies.');
-      }
+      if ((await repo.countActiveCompanies(organization.id)) > 0) throw new OrganizationInvariantError('ORGANIZATION_HAS_ACTIVE_COMPANIES', 'Organization has active companies.');
       await repo.updateOrganizationStatus(organization.id, 'PASSIVE');
-      await repo.appendAudit(withOptionalAuditFields({
-        tenantId: input.tenantId,
-        action: 'ORGANIZATION_PASSIVATED',
-        entityType: 'ORGANIZATION',
-        entityId: organization.id,
-        before: { status: organization.status },
-        after: { status: 'PASSIVE' },
-      }, input.actorUserId, input.correlationId));
+      await repo.appendAudit(withOptionalAuditFields({ tenantId: input.tenantId, action: 'ORGANIZATION_PASSIVATED', entityType: 'ORGANIZATION', entityId: organization.id, before: { status: organization.status }, after: { status: 'PASSIVE' } }, input.actorUserId, input.correlationId));
     });
   }
 
@@ -111,107 +98,51 @@ export class OrganizationLifecycleService {
       const company = requireRecord(await repo.getCompany(input.companyId), 'COMPANY_NOT_FOUND', 'Company not found.');
       ensureSameTenant(input.tenantId, company.tenantId);
       if (company.status === 'PASSIVE') return;
-      if ((await repo.countActiveDepartments(company.id)) > 0) {
-        throw new OrganizationInvariantError('COMPANY_HAS_ACTIVE_DEPARTMENTS', 'Company has active departments.');
-      }
+      if ((await repo.countActiveDepartments(company.id)) > 0) throw new OrganizationInvariantError('COMPANY_HAS_ACTIVE_DEPARTMENTS', 'Company has active departments.');
       await repo.updateCompanyStatus(company.id, 'PASSIVE');
-      await repo.appendAudit(withOptionalAuditFields({
-        tenantId: input.tenantId,
-        action: 'COMPANY_PASSIVATED',
-        entityType: 'COMPANY',
-        entityId: company.id,
-        before: { status: company.status },
-        after: { status: 'PASSIVE' },
-      }, input.actorUserId, input.correlationId));
+      await repo.appendAudit(withOptionalAuditFields({ tenantId: input.tenantId, action: 'COMPANY_PASSIVATED', entityType: 'COMPANY', entityId: company.id, before: { status: company.status }, after: { status: 'PASSIVE' } }, input.actorUserId, input.correlationId));
     });
   }
 
-  async moveDepartment(input: {
-    tenantId: string;
-    departmentId: string;
-    newParentDepartmentId: string | null;
-    actorUserId?: string;
-    correlationId?: string;
-  }) {
+  async moveDepartment(input: { tenantId: string; departmentId: string; newParentDepartmentId: string | null; actorUserId?: string; correlationId?: string }) {
     return this.tx.transaction(async (repo) => {
-      const department = requireRecord(
-        await repo.getDepartment(input.departmentId),
-        'DEPARTMENT_NOT_FOUND',
-        'Department not found.',
-      );
+      const department = requireRecord(await repo.getDepartment(input.departmentId), 'DEPARTMENT_NOT_FOUND', 'Department not found.');
       ensureSameTenant(input.tenantId, department.tenantId);
-
-      if (input.newParentDepartmentId === department.id) {
-        throw new OrganizationInvariantError('DEPARTMENT_SELF_PARENT', 'Department cannot be its own parent.');
-      }
-
+      if (input.newParentDepartmentId === department.id) throw new OrganizationInvariantError('DEPARTMENT_SELF_PARENT', 'Department cannot be its own parent.');
       if (input.newParentDepartmentId) {
-        const parent = requireRecord(
-          await repo.getDepartment(input.newParentDepartmentId),
-          'PARENT_DEPARTMENT_NOT_FOUND',
-          'Parent department not found.',
-        );
+        const parent = requireRecord(await repo.getDepartment(input.newParentDepartmentId), 'PARENT_DEPARTMENT_NOT_FOUND', 'Parent department not found.');
         ensureSameTenant(input.tenantId, parent.tenantId);
-        if (parent.companyId !== department.companyId) {
-          throw new OrganizationInvariantError('DEPARTMENT_CROSS_COMPANY_PARENT', 'Parent department must belong to the same company.');
-        }
-
+        if (parent.companyId !== department.companyId) throw new OrganizationInvariantError('DEPARTMENT_CROSS_COMPANY_PARENT', 'Parent department must belong to the same company.');
         const departments = await repo.listDepartmentsByCompany(department.companyId);
         const parentById = new Map(departments.map((item) => [item.id, item.parentDepartmentId]));
         let cursor: string | null = parent.id;
         const visited = new Set<string>();
         while (cursor) {
-          if (cursor === department.id) {
-            throw new OrganizationInvariantError('DEPARTMENT_CYCLE', 'Department move would create a hierarchy cycle.');
-          }
-          if (visited.has(cursor)) {
-            throw new OrganizationInvariantError('DEPARTMENT_EXISTING_CYCLE', 'Existing department hierarchy contains a cycle.');
-          }
+          if (cursor === department.id) throw new OrganizationInvariantError('DEPARTMENT_CYCLE', 'Department move would create a hierarchy cycle.');
+          if (visited.has(cursor)) throw new OrganizationInvariantError('DEPARTMENT_EXISTING_CYCLE', 'Existing department hierarchy contains a cycle.');
           visited.add(cursor);
           cursor = parentById.get(cursor) ?? null;
         }
       }
-
       if (department.parentDepartmentId === input.newParentDepartmentId) return;
       await repo.updateDepartment({ id: department.id, parentDepartmentId: input.newParentDepartmentId });
-      await repo.appendAudit(withOptionalAuditFields({
-        tenantId: input.tenantId,
-        action: 'DEPARTMENT_MOVED',
-        entityType: 'DEPARTMENT',
-        entityId: department.id,
-        before: { parentDepartmentId: department.parentDepartmentId },
-        after: { parentDepartmentId: input.newParentDepartmentId },
-      }, input.actorUserId, input.correlationId));
+      await repo.appendAudit(withOptionalAuditFields({ tenantId: input.tenantId, action: 'DEPARTMENT_MOVED', entityType: 'DEPARTMENT', entityId: department.id, before: { parentDepartmentId: department.parentDepartmentId }, after: { parentDepartmentId: input.newParentDepartmentId } }, input.actorUserId, input.correlationId));
     });
   }
 
   async passivateDepartment(input: { tenantId: string; departmentId: string; actorUserId?: string; correlationId?: string }) {
     return this.tx.transaction(async (repo) => {
-      const department = requireRecord(
-        await repo.getDepartment(input.departmentId),
-        'DEPARTMENT_NOT_FOUND',
-        'Department not found.',
-      );
+      const department = requireRecord(await repo.getDepartment(input.departmentId), 'DEPARTMENT_NOT_FOUND', 'Department not found.');
       ensureSameTenant(input.tenantId, department.tenantId);
       if (department.status === 'PASSIVE') return;
-      const descendants = (await repo.listDepartmentsByCompany(department.companyId)).filter(
-        (item) => item.parentDepartmentId === department.id && item.status === 'ACTIVE',
-      );
-      if (descendants.length > 0) {
-        throw new OrganizationInvariantError('DEPARTMENT_HAS_ACTIVE_CHILDREN', 'Department has active child departments.');
-      }
+      const descendants = (await repo.listDepartmentsByCompany(department.companyId)).filter((item) => item.parentDepartmentId === department.id && item.status === 'ACTIVE');
+      if (descendants.length > 0) throw new OrganizationInvariantError('DEPARTMENT_HAS_ACTIVE_CHILDREN', 'Department has active child departments.');
       await repo.updateDepartment({ id: department.id, status: 'PASSIVE' });
-      await repo.appendAudit(withOptionalAuditFields({
-        tenantId: input.tenantId,
-        action: 'DEPARTMENT_PASSIVATED',
-        entityType: 'DEPARTMENT',
-        entityId: department.id,
-        before: { status: department.status },
-        after: { status: 'PASSIVE' },
-      }, input.actorUserId, input.correlationId));
+      await repo.appendAudit(withOptionalAuditFields({ tenantId: input.tenantId, action: 'DEPARTMENT_PASSIVATED', entityType: 'DEPARTMENT', entityId: department.id, before: { status: department.status }, after: { status: 'PASSIVE' } }, input.actorUserId, input.correlationId));
     });
   }
 }
 
 export * from './employment.js';
 export * from './group-membership.js';
+export * from './integrations.js';
