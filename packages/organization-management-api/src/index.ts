@@ -24,16 +24,8 @@ export interface CollectionEnvelope<T> {
   meta: { nextCursor: string | null; count: number; correlationId: string };
 }
 
-export interface ErrorEnvelope {
-  error: ApiError;
-}
-
-export interface RouteContract {
-  method: HttpMethod;
-  path: string;
-  mutation: boolean;
-  lifecycleCommand?: boolean;
-}
+export interface ErrorEnvelope { error: ApiError; }
+export interface RouteContract { method: HttpMethod; path: string; mutation: boolean; lifecycleCommand?: boolean; }
 
 export const coreOrganizationRoutes: readonly RouteContract[] = [
   { method: 'GET', path: '/api/v1/organizations', mutation: false },
@@ -88,34 +80,12 @@ export interface CoreResourceService {
 }
 
 const forbiddenPayloadKeys = new Set(['tenantId', 'tenant_id']);
-
-export function assertNoClientTenantOverride(payload: Record<string, unknown>): void {
-  for (const key of forbiddenPayloadKeys) {
-    if (Object.prototype.hasOwnProperty.call(payload, key)) {
-      throw new Error('CLIENT_TENANT_OVERRIDE_FORBIDDEN');
-    }
-  }
-}
-
-export function resourceEnvelope<T>(data: T, correlationId: string): ResourceEnvelope<T> {
-  return { data, meta: { correlationId } };
-}
-
-export function collectionEnvelope<T>(data: T[], correlationId: string, nextCursor: string | null = null): CollectionEnvelope<T> {
-  return { data, meta: { nextCursor, count: data.length, correlationId } };
-}
-
-export function errorEnvelope(code: string, correlationId: string, details?: unknown): ErrorEnvelope {
-  return {
-    error: {
-      code,
-      message: 'İşlem gerçekleştirilemedi.',
-      ...(details !== undefined ? { details } : {}),
-      correlationId,
-    },
-  };
-}
+export function assertNoClientTenantOverride(payload: Record<string, unknown>): void { for (const key of forbiddenPayloadKeys) if (Object.prototype.hasOwnProperty.call(payload, key)) throw new Error('CLIENT_TENANT_OVERRIDE_FORBIDDEN'); }
+export function resourceEnvelope<T>(data: T, correlationId: string): ResourceEnvelope<T> { return { data, meta: { correlationId } }; }
+export function collectionEnvelope<T>(data: T[], correlationId: string, nextCursor: string | null = null): CollectionEnvelope<T> { return { data, meta: { nextCursor, count: data.length, correlationId } }; }
+export function errorEnvelope(code: string, correlationId: string, details?: unknown): ErrorEnvelope { return { error: { code, message: 'İşlem gerçekleştirilemedi.', ...(details !== undefined ? { details } : {}), correlationId } }; }
 
 export * from './employee-employment.js';
 export * from './group-role.js';
 export * from './shared-gates.js';
+export * from './integrations.js';
