@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { canRenderProtectedShell, sessionMessage, type SessionState, type SessionStatus } from './auth';
 import { InstructorAuthoringWorkspace } from './authoring-ui';
 import { QuestionAssessmentWorkspace } from './assessment-ui';
+import { OrganizationAdminView } from './organization-admin-ui';
 import { navForRole, type WebRole } from './navigation';
 import { defaultScreenFor, screenFor, type ScreenDefinition } from './screens';
 import './styles.css';
@@ -54,6 +55,27 @@ function StatePanel({ state }: { state: Exclude<ViewState, 'success'> }) {
 function WorkflowScreen({ screen, role }: { screen: ScreenDefinition; role: WebRole }) {
   if (role === 'instructor' && screen.href === '/instructor/trainings') return <InstructorAuthoringWorkspace />;
   if (role === 'instructor' && (screen.href === '/instructor/questions' || screen.href === '/instructor/assessments')) return <QuestionAssessmentWorkspace />;
+  if (role === 'tenant_admin' && screen.href === '/admin/organization') {
+    return <OrganizationAdminView
+      state="ready"
+      organization={{ id: 'org-demo', name: 'Kurumsal Organizasyon', code: 'ORG', status: 'ACTIVE', companyCount: 2, departmentCount: 5, employeeCount: 128 }}
+      companies={[
+        { id: 'company-1', name: 'Ana Şirket', code: 'AS', status: 'ACTIVE', departmentCount: 3, employeeCount: 94 },
+        { id: 'company-2', name: 'İştirak', code: 'IST', status: 'ACTIVE', departmentCount: 2, employeeCount: 34 },
+      ]}
+      departmentsByCompany={{
+        'company-1': [
+          { id: 'dep-1', name: 'Bilgi Teknolojileri', code: 'BT', status: 'ACTIVE', companyId: 'company-1', children: [
+            { id: 'dep-2', name: 'Altyapı', code: 'ALT', status: 'ACTIVE', companyId: 'company-1', children: [] },
+          ] },
+          { id: 'dep-3', name: 'İnsan Kaynakları', code: 'IK', status: 'ACTIVE', companyId: 'company-1', children: [] },
+        ],
+        'company-2': [
+          { id: 'dep-4', name: 'Operasyon', code: 'OPS', status: 'ACTIVE', companyId: 'company-2', children: [] },
+        ],
+      }}
+    />;
+  }
   const learner = role === 'learner';
   return <>
     <header className="page-header">
