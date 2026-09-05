@@ -214,3 +214,4 @@ export class OrganizationLifecycleService {
 }
 
 export * from './employment.js';
+export * from './group-membership.js';
