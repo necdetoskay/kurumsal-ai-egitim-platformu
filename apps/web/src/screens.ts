@@ -16,6 +16,10 @@ export interface ScreenDefinition {
 
 export const screens: readonly ScreenDefinition[] = [
   { id: 9, href: '/admin', roles: ['tenant_admin'], title: 'Yönetim Paneli', description: 'Organizasyon, eğitim ve operasyon özetleri.', workflowStates: ['active'], tone: 'info' },
+  { id: 65, href: '/admin/organization', roles: ['tenant_admin'], title: 'Organizasyon Genel Bakış', description: 'Organizasyon, şirket ve departman yapısını yönetin.', workflowStates: ['ready', 'loading', 'empty', 'error', 'forbidden'], tone: 'info' },
+  { id: 66, href: '/admin/organization/setup', roles: ['tenant_admin'], title: 'İlk Organizasyon Kurulumu', description: 'İlk organizasyon ve şirket yapısını güvenli kurulum akışıyla oluşturun.', workflowStates: ['empty', 'editing', 'saving', 'completed', 'error'] },
+  { id: 67, href: '/admin/organization/companies', roles: ['tenant_admin'], title: 'Şirket Yönetimi', description: 'Şirketleri oluşturun, düzenleyin ve yaşam döngüsünü yönetin.', workflowStates: ['ready', 'empty', 'passivated', 'reactivated', 'forbidden'] },
+  { id: 68, href: '/admin/organization/departments', roles: ['tenant_admin'], title: 'Departman Yönetimi', description: 'Departman ağacını yönetin ve güvenli taşıma komutlarını uygulayın.', workflowStates: ['ready', 'empty', 'moving', 'move-blocked', 'passivated', 'forbidden'] },
   { id: 23, href: '/instructor/trainings', roles: ['instructor'], title: 'Eğitimler', description: 'Taslak, inceleme ve yayın durumundaki eğitimleri yönetin.', workflowStates: ['draft', 'in-review', 'changes-requested', 'published', 'archived'] },
   { id: 24, href: '/instructor/trainings/new', roles: ['instructor'], title: 'Yeni Eğitim', description: 'Yeni training draft oluşturun.', workflowStates: ['draft', 'validation-error'] },
   { id: 25, href: '/instructor/trainings/editor', roles: ['instructor'], title: 'Eğitim Editörü', description: 'Training metadata ve içerik yapısını düzenleyin.', workflowStates: ['editing', 'saving', 'saved', 'save-failed'] },
