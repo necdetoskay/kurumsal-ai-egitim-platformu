@@ -1,4 +1,4 @@
-export type HttpMethod = 'GET' | 'POST' | 'PATCH';
+export type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
 
 export interface AuthContext {
   tenantId: string;
@@ -117,3 +117,4 @@ export function errorEnvelope(code: string, correlationId: string, details?: unk
 }
 
 export * from './employee-employment.js';
+export * from './group-role.js';
