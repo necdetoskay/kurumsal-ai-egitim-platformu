@@ -130,6 +130,7 @@ export const departments = pgTable(
       table.companyId,
       table.id,
     ),
+    tenantIdIdUq: unique('departments_tenant_id_id_uq').on(table.tenantId, table.id),
     parentNotSelf: check(
       'departments_parent_not_self_ck',
       sql`${table.parentDepartmentId} is null or ${table.parentDepartmentId} <> ${table.id}`,
