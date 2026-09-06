@@ -89,3 +89,4 @@ export * from './employee-employment.js';
 export * from './group-role.js';
 export * from './shared-gates.js';
 export * from './integrations.js';
+export * from './training-audience.js';
