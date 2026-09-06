@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { check, foreignKey, index, jsonb, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { check, foreignKey, index, integer, jsonb, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 import { tenants, users } from './schema.js';
 import { trainings, trainingVersions } from './training-schema.js';
 import { organizations, companies, departments } from './organization-schema.js';
@@ -45,10 +45,10 @@ export const trainingAudienceResolutions = pgTable('training_audience_resolution
   trainingVersionId: uuid('training_version_id').notNull().references(() => trainingVersions.id, { onDelete: 'restrict' }),
   status: trainingAudienceResolutionStatus('status').notNull(),
   fingerprint: text('fingerprint').notNull(),
-  targetCount: text('target_count').notNull(),
-  overlapCount: text('overlap_count').notNull(),
-  uniqueEmployeeCount: text('unique_employee_count').notNull(),
-  assignableLearnerCount: text('assignable_learner_count').notNull(),
+  targetCount: integer('target_count').notNull(),
+  overlapCount: integer('overlap_count').notNull(),
+  uniqueEmployeeCount: integer('unique_employee_count').notNull(),
+  assignableLearnerCount: integer('assignable_learner_count').notNull(),
   correlationId: text('correlation_id'),
   createdByUserId: uuid('created_by_user_id').references(() => users.id, { onDelete: 'restrict' }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
