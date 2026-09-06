@@ -21,14 +21,15 @@ describe('OperationsAdminApi', () => {
     expect(post).toHaveBeenCalledWith('/api/v1/organization-imports/imp%2F1/confirm', { reviewed: true });
   });
 
-  it('previews audience before idempotent confirmation', async () => {
+  it('previews audience before fingerprint-bound idempotent confirmation', async () => {
     const { http, post } = client();
     const api = new OperationsAdminApi(http);
     const targets = [{ type: 'GROUP' as const, id: 'g1' }, { type: 'EMPLOYEE' as const, id: 'e1' }];
-    await api.previewAudience(targets);
-    await api.confirmAudience(targets, 'idem-1');
-    expect(post).toHaveBeenCalledWith('/api/v1/training-audiences/preview', { targets });
-    expect(post).toHaveBeenCalledWith('/api/v1/training-audiences/confirm', { targets, idempotencyKey: 'idem-1' });
+    const base = { organizationId: 'o1', trainingId: 't1', trainingVersionId: 'v1', targets };
+    await api.previewAudience(base);
+    await api.confirmAudience({ ...base, resolutionFingerprint: 'a'.repeat(64), idempotencyKey: 'idem-1' });
+    expect(post).toHaveBeenCalledWith('/api/v1/training-audiences/preview', base);
+    expect(post).toHaveBeenCalledWith('/api/v1/training-audiences/confirm', { ...base, resolutionFingerprint: 'a'.repeat(64), idempotencyKey: 'idem-1' });
   });
 
   it('rejects client tenant override', () => {
