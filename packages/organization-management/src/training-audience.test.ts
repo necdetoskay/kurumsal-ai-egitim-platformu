@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TrainingAudienceInvariantError, TrainingAudienceResolver, type AudienceCandidate, type TrainingAudienceRepository, type TrainingAudienceTarget } from './training-audience.js';
+import { TrainingAudienceResolver, type AudienceCandidate, type TrainingAudienceRepository, type TrainingAudienceTarget } from './training-audience.js';
 
 function candidate(employeeId: string, learnerUserId: string | null): AudienceCandidate {
   return { employeeId, learnerUserId, tenantId: 't1', organizationId: 'o1' };
@@ -53,6 +53,6 @@ describe('TrainingAudienceResolver', () => {
   it('fails closed for cross-tenant targets', async () => {
     const resolver = new TrainingAudienceResolver(repository());
     await expect(resolver.preview({ tenantId: 't1', organizationId: 'o1', targets: [{ type: 'GROUP', id: 'foreign' }] }))
-      .rejects.toMatchObject<Partial<TrainingAudienceInvariantError>>({ code: 'CROSS_TENANT_REFERENCE' });
+      .rejects.toMatchObject({ code: 'CROSS_TENANT_REFERENCE' });
   });
 });
