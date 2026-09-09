@@ -1,11 +1,33 @@
 # DESIGN FREEZE — V1
 
-Status: Design Freeze Candidate
-Version: 1.0
+**Status:** ACTIVE BASELINE — LIMITED REOPEN UNDER AEGIS MUR #105  
+**Version:** 1.1-review  
+**Release baseline:** `main`  
+**Canonical implementation order:** `docs/10-sprints/BACKEND_FIRST_SPRINT_ROADMAP_V1.md`
+
+## AEGIS MUR Amendment — 2026-09-09
+
+AEGIS MUR #105 does **not** discard the V1 design foundation. The core technical and safety invariants below remain frozen.
+
+MUR temporarily reopens only the following governance/product-alignment questions:
+
+1. reconcile the default `main` baseline with `design/organization-management-canonical-v1`,
+2. constrain future Organization Management expansion to the learning-product purpose,
+3. complete the learner mission flow,
+4. complete Learning Objective evidence -> bounded Learning Insight -> recommendation/repeat,
+5. add mission-level E2E qualification before V1 release,
+6. remove ambiguity from historical roadmap/doc entry points.
+
+`main` remains the single V1 release baseline. Work on `design/organization-management-canonical-v1` is an integration source and is not considered part of the release baseline until promoted to `main` through reviewed qualification.
+
+The historical `docs/18-sprints/SPRINT_ROADMAP_V1.md` is superseded for execution ordering. It remains only for traceability.
+
+The immediate recovery overlay is:
+`docs/13-governance/aegis-mur/RECOVERY_ROADMAP_V1.md`.
 
 ## Freeze Scope
 
-V1 için aşağıdaki alanlar kanonik olarak dondurulmuştur:
+V1 için aşağıdaki alanlar kanonik temel olarak korunur:
 - Vision / V1 scope / domain boundaries
 - Core business rules
 - Roles & permission model
@@ -26,7 +48,7 @@ V1 için aşağıdaki alanlar kanonik olarak dondurulmuştur:
 
 Canonical order is defined by `docs/10-sprints/BACKEND_FIRST_SPRINT_ROADMAP_V1.md`.
 
-Frontend implementation begins after backend contract completion and critical backend E2E qualification.
+AEGIS MUR recovery phases may temporarily reorder **remaining work** to close mission gaps, but they do not redefine completed sprint identities. The recovery overlay must always preserve dependency and hard-gate requirements from the canonical backend-first roadmap.
 
 ## Frozen Hard Invariants
 
@@ -42,6 +64,9 @@ Changes require explicit change issue/ADR and requalification:
 - AI hard gates cannot be bypassed by weighted score
 - critical AI content requires policy-defined human review
 - published/versioned integrity rules
+- immutable learning/assessment/history evidence where already established
+
+AEGIS MUR cannot waive these invariants merely for schedule or scope convenience.
 
 ## Standards Baseline
 
@@ -67,19 +92,41 @@ The following are not automatically V1 commitments unless promoted through an ex
 - Competency Graph / Skill Gap
 - Adaptive Learning
 - Native Mobile
-- SCORM/xAPI and enterprise integrations
+- SCORM/xAPI and broad enterprise integrations
+- further HR/ERP/AD integration productization beyond already accepted bounded contracts
 - Gamification/social learning/AI media
 - Multilingual external source discovery & YouTube research (#18), unless promoted into active V1 scope
+
+Existing code/contracts are not deleted simply because further expansion is deferred.
 
 ## Change Control
 
 After Design Freeze:
 1. Open change issue.
-2. Identify affected canonical docs/contracts/sprints/tests.
-3. Create/update ADR when architecture or invariant changes.
-4. Re-run applicable ULTEF design/contract gates.
-5. Update Design Freeze baseline/version if accepted.
+2. State which Purpose Baseline outcome the change serves.
+3. Identify affected canonical docs/contracts/sprints/tests.
+4. Create/update ADR when architecture or invariant changes.
+5. Re-run applicable ULTEF design/contract gates.
+6. Run affected AEGIS MUR mission scenarios when the change touches the learning loop.
+7. Update Design Freeze baseline/version if accepted.
 
-## Implementation Readiness
+## V1 Mission Release Gate
 
-Sprint 01 may start when Design Freeze qualification PASS evidence exists and no blocking design issue remains.
+In addition to technical qualification, V1 must prove the mission-level scenarios defined by AEGIS MUR:
+
+- `MUR-E2E-001` author -> audience -> learner -> assessment -> insight -> recommendation -> certificate -> admin aggregate
+- `MUR-E2E-002` insufficient-evidence abstention
+- `MUR-E2E-003` cross-tenant failure
+- `MUR-E2E-004` replay/idempotency/history integrity
+
+A technically green subsystem set is not sufficient for V1 release if the end-to-end learning mission cannot be demonstrated on `main`.
+
+## Current Implementation Readiness Rule
+
+New V1 feature expansion is frozen during MUR recovery unless it:
+
+1. unblocks the next mission phase,
+2. closes a CRITICAL/HIGH MUR finding, or
+3. is required for security, data integrity or release safety.
+
+The next baseline work is canonical reconciliation and qualified promotion of already-completed Organization work, followed by learner and Learning Insight mission completion.
