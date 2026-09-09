@@ -13,45 +13,64 @@ The recovery roadmap is intentionally narrower than the full backlog. Its goal i
 ### Goal
 Establish one trusted execution baseline before new feature expansion.
 
-### Work
+### Evidence already established
+
+- `main` is not the only branch containing accepted project work.
+- `design/organization-management-canonical-v1` is ahead of `main` and contains Organization canonical docs and implementation.
+- PR #99 (Phase 5) and PR #104 (Phase 6) are merged to that branch, not to `main`.
+- Therefore Organization work must be integrated/qualified, not reimplemented.
+
+### Remaining work
+- decide the promoted V1 baseline strategy for `main` vs `design/organization-management-canonical-v1`,
 - reconcile `DESIGN_FREEZE_v1.md` status/version,
-- select one canonical V1 roadmap and mark conflicting roadmap historical/subordinate,
-- reconcile Organization Management canonical docs referenced by #56 with actual `main`,
-- map closed issues to merged PR/commit/test/runtime evidence,
-- identify any `closed` item whose evidence is absent from current baseline,
-- record gaps without silently reopening/reclassifying unrelated historical work.
+- select one canonical V1 roadmap and mark the conflicting roadmap historical/subordinate,
+- map critical closed issues to PR -> target branch -> merge commit -> test/runtime evidence,
+- verify the Organization branch against current root build/test/migration/runtime gates before promotion,
+- record any incompatibility introduced by the 34-commit branch delta.
 
 ### Exit gate
+- exactly one declared V1 integration/release baseline,
 - exactly one active execution roadmap,
-- no canonical doc path referenced by active V1 epic is unresolved,
-- issue -> PR -> commit -> tests -> runtime evidence chain available for critical completed work.
+- no active canonical epic references unresolved docs,
+- Organization branch promotion/rejection decision recorded,
+- issue -> PR -> target branch -> merge commit -> tests/runtime evidence chain available for critical completed work.
 
-## Phase M1 — Organization-to-Learning Bridge
+## Phase M1 — Promote & Qualify Organization-to-Learning Bridge
 
 ### Goal
-Use Organization Management for its mission purpose: resolve who receives training.
+Bring the already implemented Organization audience capability into the declared V1 baseline and prove it connects to Learning Assignment correctly.
+
+### Existing implementation evidence
+
+Phase 6 #68 / PR #104 already provides:
+- typed Organization / Company / Department / Group / Employee audience targets,
+- exactly-one-target persistence constraint,
+- deterministic resolver,
+- overlap deduplication,
+- explicit unlinked Employee -> User handling,
+- stable resolution fingerprint/snapshot lineage,
+- preview counts,
+- side-effect-free preview,
+- idempotent confirm/handoff contract,
+- cross-tenant/cross-organization fail-closed behavior,
+- API/web qualification tests.
 
 ### Work
-- finish typed audience targets: Organization / Company / Department / Group / Employee,
-- deterministic employee resolution,
-- overlap deduplication,
-- unlinked employee visibility,
-- stable audience snapshot/fingerprint,
-- preview before commit,
-- idempotent assignment handoff,
-- cross-tenant/scope negative qualification.
-
-### Related work
-- #68 and child issues #100–#103
-- learning Assignment domain
+- integrate/rebase the Organization canonical branch into the chosen V1 baseline,
+- resolve root-package/API/web conflicts without weakening Organization invariants,
+- bind assignment handoff to the actual Learning Assignment application boundary,
+- run DB migration qualification against representative baseline data,
+- run mixed-target, replay, tenant and historical snapshot tests,
+- remove any duplicate implementation created outside the canonical branch.
 
 ### Explicit non-goals
 - new HR/ERP adapters,
 - generalized HR workflow expansion,
-- additional Organization dashboard polish not required by audience selection.
+- additional Organization dashboard polish not required by audience selection,
+- rebuilding #68 from scratch.
 
 ### Exit gate
-A real training can be assigned to mixed organization targets and result in one deterministic learner assignment set with stable historical evidence.
+A real published training can be assigned through the integrated Organization audience resolver and produce one deterministic learner assignment set with stable historical evidence on the declared V1 baseline.
 
 ## Phase M2 — Learner Core Experience
 
@@ -191,8 +210,8 @@ Only after mission completion, finish release readiness.
 
 The following remain frozen unless a critical deployment dependency is demonstrated:
 
-- HR/ERP adapter ecosystem,
-- broad AD/LDAP integration expansion,
+- further HR/ERP adapter ecosystem expansion,
+- broad AD/LDAP productization beyond already implemented contracts,
 - AI Tutor,
 - competency/career platform,
 - adaptive curriculum,
