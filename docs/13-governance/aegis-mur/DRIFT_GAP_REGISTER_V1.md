@@ -16,7 +16,7 @@
 **Severity:** CRITICAL  
 **Type:** Mission gap
 
-The V1 purpose requires the learner to receive an assignment, consume training, resume progress, complete assessment, see result/retake/certificate and consume bounded learning insight. The learner experience issue remains a direct blocker and current web surfaces contain substantial shell/state-contract behavior rather than a fully demonstrated real API/DB flow.
+The V1 purpose requires the learner to receive an assignment, consume training, resume progress, complete assessment, see result/retake/certificate and consume bounded learning insight. The learner experience issue remains a direct blocker and current `main` web surfaces contain substantial shell/state-contract behavior rather than a fully demonstrated real API/DB flow.
 
 **Required action:** Prioritize #48 and prove `assignment -> learning -> resume -> assessment -> result -> certificate` through real persistence and browser/API qualification.
 
@@ -38,20 +38,20 @@ The product vision differentiates itself from a classic LMS through Learning Obj
 **Severity:** HIGH  
 **Type:** Scope drift
 
-Canonical scope states V1 is not a full HR system and broad enterprise HR integrations are Later. Organization Management later expanded into temporal employment, external identities, imports, AD/LDAP and HR/ERP adapter contracts.
+Canonical scope states V1 is not a full HR system and broad enterprise HR integrations are Later. Organization Management expanded into temporal employment, external identities, imports, AD/LDAP and HR/ERP adapter contracts. These capabilities are implemented on the Organization canonical branch, so MUR must rescope rather than pretend the work does not exist.
 
-**Required action:** Keep the organization model required for learning targeting, authorization, history and analytics. Rescope Position/Location/employment depth. Move HR/ERP integration to deferred scope. AD/LDAP is conditional on target deployment need rather than default V1 blocker.
+**Required action:** Preserve working organization/audience/history/audit foundations. Do not remove already useful code merely to reduce scope. Freeze further HR/ERP expansion; treat HR/ERP and broad AD/LDAP ecosystem work as deferred unless a V1 deployment dependency proves otherwise.
 
 ---
 
-### MUR-004 — Mission-critical audience bridge was sequenced after adjacent organization work
+### MUR-004 — Audience bridge exists but is not in the current `main` baseline
 
 **Severity:** HIGH  
-**Type:** Priority inversion
+**Type:** Integration / baseline gap
 
-Training audience resolution is the direct bridge from Organization Management to the learning product, yet import/integration/audit work can be completed before the learner mission is closed.
+Phase 6 #68 is completed on `design/organization-management-canonical-v1`. PR #104 merged into that branch and implements typed audience persistence, deterministic resolution, overlap deduplication, stable fingerprint/snapshot, explicit unlinked Employee -> User handling, preview and idempotent confirm/handoff. The branch is currently ahead of `main`, so the mission-critical bridge exists but is not part of the inspected default product baseline.
 
-**Required action:** Make audience resolver + stable assignment snapshot a higher product priority than additional enterprise integrations.
+**Required action:** Integrate/rebase/qualify the Organization canonical branch against the chosen V1 baseline before reimplementing audience functionality. Do not duplicate #68.
 
 ---
 
@@ -73,37 +73,37 @@ Training audience resolution is the direct bridge from Organization Management t
 **Severity:** HIGH  
 **Type:** Governance drift
 
-`DESIGN_FREEZE_v1.md` still identifies itself as `Design Freeze Candidate`, while many implementation sprints have proceeded and Organization Management refers to design-frozen canonical sources.
+`DESIGN_FREEZE_v1.md` on `main` still identifies itself as `Design Freeze Candidate`, while many implementation sprints have proceeded and the Organization canonical branch contains its own traceability/design-freeze package.
 
-**Required action:** Reconcile Design Freeze status/version after MUR. Do not claim a frozen baseline when canonical source set is incomplete or conflicting.
+**Required action:** Reconcile Design Freeze status/version only after selecting the baseline branch and canonical roadmap. The freeze statement must identify exactly which commit/document set it freezes.
 
 ---
 
-### MUR-007 — Organization epic references canonical documents not present on current main
+### MUR-007 — Canonical truth is split across `main` and an unintegrated Organization branch
 
 **Severity:** HIGH  
-**Type:** Traceability gap
+**Type:** Branch/canonical truth drift
 
-Epic #56 references intent, architecture, business rules, API, VCE index and governance/design-freeze documents that are not all visible in the current `main` tree.
+Investigation found `design/organization-management-canonical-v1` ahead of `main` by 34 commits. It contains the Organization intent, architecture, business rules, API contract, VCE index, governance traceability, persistence/domain/API/UI implementation and training-audience work that Epic #56 references. Therefore the earlier apparent “missing documents” are not lost; they live on a separate canonical branch.
 
-**Risk:** Issue closure can reference non-existent canonical sources.
+**Risk:** `main` says one thing while active/closed issues and the Organization branch say another. Agents starting from the default branch cannot reconstruct the actual project state.
 
-**Required action:** Locate the actual accepted branch/PR or restore the documents before further canonical closure. If they never landed, downgrade closure evidence and requalify affected phases.
+**Required action:** Decide whether `design/organization-management-canonical-v1` is to be promoted into the V1 baseline. If yes, integrate it via a reviewed PR/rebase strategy and run full regression/MUR qualification. If no, explicitly mark it experimental/historical and reconcile all issues that treated it as canonical.
 
 ---
 
-### MUR-008 — Issue “completed” state is not sufficient proof of main/runtime completion
+### MUR-008 — “Merged” is branch-relative; closure evidence must name the target baseline
 
 **Severity:** HIGH  
 **Type:** Evidence governance
 
-Some Organization Management phases have been closed while the currently inspected `main` baseline does not expose corresponding full implementation/docs. This does not prove the work is absent—it proves the closure evidence chain must be reconciled.
+PR #99 (Phase 5 import/integrations/audit) and PR #104 (Phase 6 audience integration) are genuinely merged, but their base is `design/organization-management-canonical-v1`, not `main`. Their issue closures are therefore supported by real branch-level implementation evidence, yet they do not prove default-branch product completion.
 
-**Required action:** Establish mandatory closure tuple:
+**Required action:** Mandatory closure tuple becomes:
 
-`issue -> PR -> merged commit -> canonical docs -> tests -> runtime evidence -> main verification`
+`issue -> PR -> target branch -> merge commit -> canonical docs -> tests/runtime evidence -> promoted V1 baseline`
 
-No item is MUR-complete from issue state alone.
+A branch-local merge is valid evidence, but V1 completion additionally requires inclusion in the declared release baseline.
 
 ---
 
@@ -156,13 +156,15 @@ Role switching, demo sessions and state selectors are useful for UI qualificatio
 | No full rewrite | ACCEPTED |
 | Preserve domain-first architecture | ACCEPTED |
 | Preserve security/tenant/immutability hard gates | ACCEPTED |
+| Do not duplicate completed Organization audience work | ACCEPTED |
 | Freeze new V1 scope during MUR recovery | ACCEPTED for review branch |
-| Rescope Organization Management to learning-purpose boundary | PROPOSED / requires merge acceptance |
-| Defer HR/ERP adapter ecosystem from V1 | PROPOSED / requires merge acceptance |
+| Rescope further Organization Management expansion to learning-purpose boundary | PROPOSED / requires merge acceptance |
+| Defer further HR/ERP adapter ecosystem expansion from V1 | PROPOSED / requires merge acceptance |
 | Promote Learner Experience + Learning Insight as mission blockers | PROPOSED / requires merge acceptance |
 | Add Mission E2E release gate | PROPOSED / requires implementation |
+| Reconcile `main` vs Organization canonical branch | REQUIRED |
 | Reconcile roadmap and Design Freeze | REQUIRED |
 
 ## Closure rule for findings
 
-A finding may close only with direct evidence. Documentation edits alone can close documentation/governance findings, but implementation findings require executable test/runtime evidence.
+A finding may close only with direct evidence. Documentation edits alone can close documentation/governance findings, but implementation findings require executable test/runtime evidence on the declared V1 baseline.
