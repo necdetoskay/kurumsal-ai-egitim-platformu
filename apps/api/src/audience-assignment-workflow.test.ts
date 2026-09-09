@@ -90,15 +90,40 @@ describe('AEGIS MUR M1 audience -> Learning Assignment handoff', () => {
     expect(state.origins.map((item) => item.originType).sort()).toEqual(['AUDIENCE_RESOLUTION', 'DIRECT']);
   });
 
-  it('rejects handoff scope substitution and cross-tenant learner substitution', () => {
+  it('requires an idempotency key and rejects handoff scope substitution', () => {
+    expect(() => bindConfirmedAudienceToAssignments(input({ idempotencyKey: '   ' }))).toThrow('IDEMPOTENCY_KEY_REQUIRED');
     expect(() => bindConfirmedAudienceToAssignments(input({
       handoff: { ...baseHandoff, trainingVersionId: 'other-version' },
     }))).toThrow('HANDOFF_SCOPE_MISMATCH');
+  });
 
+  it('rejects cross-tenant or inactive learner substitution', () => {
     expect(() => bindConfirmedAudienceToAssignments(input({
       handoff: { ...baseHandoff, assignmentCandidateLearnerIds: ['learner-1'] },
       learnerScopes: [{ learnerId: 'learner-1', tenantId: 'tenant-2', active: true }],
     }))).toThrow('LEARNER_SCOPE_MISMATCH');
+
+    expect(() => bindConfirmedAudienceToAssignments(input({
+      handoff: { ...baseHandoff, assignmentCandidateLearnerIds: ['learner-1'] },
+      learnerScopes: [{ learnerId: 'learner-1', tenantId: 'tenant-1', active: false }],
+    }))).toThrow('LEARNER_NOT_ACTIVE');
+  });
+
+  it('rejects generated assignment ids that collide with immutable historical rows', () => {
+    const completed: TrainingAssignment = {
+      id: 'assignment-learner-1',
+      tenantId: 'tenant-1',
+      learnerId: 'learner-1',
+      trainingId: 'training-1',
+      trainingVersionId: 'version-1',
+      status: 'COMPLETED',
+      assignedAt: new Date('2026-08-01T00:00:00Z'),
+      completedAt: new Date('2026-08-02T00:00:00Z'),
+    };
+    expect(() => bindConfirmedAudienceToAssignments(input({
+      handoff: { ...baseHandoff, assignmentCandidateLearnerIds: ['learner-1'] },
+      existingAssignments: [completed],
+    }))).toThrow('ASSIGNMENT_ID_COLLISION');
   });
 
   it('rejects conflicting idempotency-key reuse and changed resolution lineage', () => {
