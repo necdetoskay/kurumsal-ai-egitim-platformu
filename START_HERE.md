@@ -1,73 +1,126 @@
 # START HERE
 
-Bu dosya Kurumsal AI Eğitim Platformu için ana giriş noktasıdır.
+Bu dosya Kurumsal AI Eğitim Platformu için güncel ana giriş noktasıdır.
 
-## Proje özeti
+## 1. Ürünün temel amacı
 
-Platformun amacı, kurumlarda eğitim sonrası ölçme-değerlendirme sürecini uçtan uca yönetmektir. Eğitmenler içerik ve sınav üretir; çalışanlar kendilerine atanmış eğitim ve sınavları tamamlar; sistem sonuç, sertifika, analitik ve AI destekli içgörüler üretir.
+Platform yalnız eğitim atama, sınav puanı veya sertifika üretme sistemi değildir.
 
-## İlk sürümün ana kullanıcıları
+Temel ürün döngüsü:
 
-- Platform Admin
+`Source -> Training -> Assignment -> Learning -> Assessment -> Result -> Learning Objective Evidence -> Learning Insight -> Recommendation / Repeat -> Organization Learning Action`
+
+Amaç, kurumun eğitim içeriği oluşturmasını ve çalışanlara sunmasını sağlarken **çalışanın gerçekten ne öğrendiğini**, hangi öğrenme hedeflerinde zorlandığını ve hangi aksiyonun alınması gerektiğini güvenilir evidence ile gösterebilmektir.
+
+## 2. İlk sürümün ana kullanıcıları
+
 - Tenant / Organization Admin
 - Eğitmen / Content Author
 - Reviewer
 - Learner / Personel
-- Auditor
+- gerekli audit/operasyon rolleri
 
-## Ana ürün akışı
+## 3. Ana ürün akışı
 
-1. Kullanıcı ve organizasyon yönetimi
-2. Eğitim veya kaynak içeriğinin hazırlanması
-3. AI ile soru üretimi veya manuel soru oluşturma
-4. Sınav oluşturma
-5. Personel atama
-6. Kişiye özel güvenli sınav bağlantısı / learner portal erişimi
-7. Zorunlu video veya içerik tamamlama
-8. Sınav attempt yönetimi ve kaldığı yerden devam
-9. Sonuç ve yeniden sınav süreci
-10. Sertifika
-11. Dashboard, raporlama ve analitik
+1. Tenant, kullanıcı ve gerekli organizasyon yapısı hazırlanır.
+2. Kurumsal kaynak/material sisteme alınır ve provenance/evidence korunur.
+3. Eğitmen Learning Objective ve eğitim içeriğini manuel veya kontrollü AI yardımıyla oluşturur.
+4. AI çıktıları validation/evaluation ve gerektiğinde human review'dan geçer.
+5. Eğitim immutable/versioned sınırla yayınlanır.
+6. Organization / Company / Department / Group / Employee hedefleri deterministik biçimde çözülür ve eğitim atanır.
+7. Learner eğitimi tüketir; progress/resume korunur.
+8. Assessment server-authoritative attempt ve deterministic scoring ile tamamlanır.
+9. Sonuçlar Learning Objective seviyesinde evidence üretir.
+10. Yeterli evidence varsa bounded weak-area insight ve ilgili içerik önerisi üretilir; yetersiz evidence varsa sistem abstain eder.
+11. Completion policy uygunsa sertifika üretilir.
+12. Yönetici, gizlilik ve tenant sınırlarını koruyan toplulaştırılmış öğrenme sinyallerini görür.
 
-## Önemli ürün kararları
+## 4. V1 temel kararları
 
-- Soru havuzu korunur; ancak hızlı sınav oluşturma sihirbazı doğrudan soru üretebilir.
-- AI, eğitmenin yerini almaz; üretim ve kalite yardımcısıdır.
-- Video transcript, düz metin ve konu üzerinden soru üretimi desteklenir.
-- Sınav attempt ve zorunlu video ilerlemesi kesintilerde korunur.
-- Öğrenci sınav sayfasından çıktığında güvenlik politikaları uygulanır; cevap ve süre davranışı sınav politikasına göre yönetilir.
-- Mobil native uygulama ilk sürümde yoktur; responsive web hedeflenir. Native mobil V2 kapsamındadır.
+- AI-first, AI-dependent değildir.
+- Kritik AI çıktıları kontrolsüz biçimde production'a yayınlanmaz.
+- Multi-tenancy ve tenant isolation V1 hard gate'tir.
+- Learning Objective, content -> question -> result -> insight zincirinin merkezindedir.
+- Assessment state/scoring/completion server-authoritative'dir.
+- Published/versioned ve historical evidence destructively overwrite edilmez.
+- Employee ve User farklı kavramlardır.
+- Organization Management'in V1 amacı eğitim hedefleme, authorization/history ve learning analytics bağlamını sağlamaktır; V1 full HRIS değildir.
+- Responsive web V1'dir; native mobile Later'dır.
 
-## Doküman okuma sırası
+## 5. Güncel kanonik okuma sırası
 
-1. `docs/00-foundation/`
-2. `docs/01-product/`
-3. `docs/02-domain/`
-4. `docs/03-business-rules/`
-5. `docs/04-event-storming/`
-6. `docs/05-architecture/`
-7. `docs/06-database/`
-8. `docs/07-api/`
-9. `docs/08-ai/`
-10. `docs/09-security/`
-11. `docs/10-frontend/`
-12. `docs/12-devops/`
-13. `docs/13-testing/`
-14. `docs/14-observability/`
-15. `docs/15-deployment/`
-16. `docs/16-development/`
-17. `docs/17-roadmap/`
-18. `docs/18-sprints/`
-19. `docs/20-c4-architecture/`
-20. `docs/21-uml/`
-21. `docs/22-postgresql/`
-22. `docs/23-openapi/`
-23. `docs/24-events/`
-24. `docs/25-adr/`
-25. `docs/26-ui-ux/`
-26. `docs/27-ai-prompts/`
-27. `docs/28-coding-agent-pack/`
+### Ürün amacı ve kapsam
+1. `docs/00-foundation/VISION.md`
+2. `docs/00-foundation/SCOPE.md`
+3. `docs/00-foundation/PROJECT_PRINCIPLES.md`
+4. `docs/00-foundation/PROJECT_CONTEXT.md`
 
-## Çalışma ilkesi
+### Domain ve ürün davranışı
+5. `docs/02-domain/DOMAIN_MAP.md`
+6. `docs/02-domain/BOUNDED_CONTEXTS.md`
+7. `docs/03-business-rules/CORE_BUSINESS_RULES.md`
+8. `docs/04-access/ROLES_AND_PERMISSION_MATRIX.md`
+9. `docs/05-flows/PRIMARY_USER_FLOWS.md`
 
-Dokümantasyon ürün sözleşmesidir. Kod, bu sözleşmenin uygulanmış halidir. Kodla doküman çelişirse karar bilinçli biçimde güncellenene kadar kanonik doküman esas alınır.
+### Mimari / backend / data
+10. `docs/06-architecture/`
+11. `docs/06-backend/`
+12. `docs/07-data/`
+13. `docs/07-ingestion/`
+14. `docs/09-api/`
+15. `docs/10-events/`
+16. `docs/11-adr/`
+
+### AI / authoring
+17. `docs/08-ai/`
+18. `docs/09-authoring/`
+19. `evals/golden/`
+
+### UI
+20. `docs/12-ui/`
+21. `ui-mockups/`
+
+### Execution / quality / governance
+22. `DESIGN_FREEZE_v1.md`
+23. `docs/10-sprints/BACKEND_FIRST_SPRINT_ROADMAP_V1.md` — **canonical implementation order**
+24. `docs/17-quality/`
+25. `artifacts/ultef/`
+26. `docs/13-governance/aegis-mur/` — AEGIS MUR mission recovery/governance overlay
+
+`docs/18-sprints/SPRINT_ROADMAP_V1.md` historical/superseded bir roadmap'tir; yeni execution seçimi için kullanılmaz.
+
+## 6. AEGIS MUR current state
+
+Tracking epic: **#105 — V1 Mission Realignment & Recovery Gate**
+
+Current MUR verdict:
+
+**MISSION ALIGNED / EXECUTION DRIFTED**
+
+Önemli baseline gerçeği:
+
+- `main` tek V1 release baseline olarak kalır.
+- `design/organization-management-canonical-v1` Organization Management için önemli kabul edilmiş work line'ıdır.
+- Bu branch'teki tamamlanmış işleri yeniden yazmak yerine review + qualification sonrası `main` baseline'a promote etmek hedeflenir.
+
+MUR recovery order:
+
+`M0 Canonical Truth`
+→ `M1 Organization Audience Promotion`
+→ `M2 Learner Core`
+→ `M3 Assessment/Result/Certificate`
+→ `M4 Objective Evidence`
+→ `M5 Learning Insight/Recommendation`
+→ `M6 Organization Learning Analytics`
+→ `M7 Mission E2E`
+→ `M8 Release Hardening`
+
+## 7. Çalışma ilkesi
+
+Repo içindeki kanonik dokümantasyon ürün sözleşmesidir; fakat bir belgenin eski veya başka branch'te kalmış olması otomatik olarak güncel truth olduğu anlamına gelmez.
+
+Kritik kararlar için kanıt zinciri:
+
+`Purpose -> canonical docs -> issue -> PR -> target branch -> merge commit -> tests/runtime evidence -> declared V1 baseline`
+
+Kod, issue veya branch bu zincirin dışında tek başına “V1 tamamlandı” kanıtı sayılmaz.
