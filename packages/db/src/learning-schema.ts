@@ -1,4 +1,5 @@
-import { index, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import { check, index, jsonb, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 import { tenants, users } from './schema.js';
 import { trainingVersions, trainings } from './training-schema.js';
 
@@ -15,6 +16,31 @@ export const trainingAssignments = pgTable('training_assignments', {
 }, (table) => ({
   tenantLearnerIdx: index('training_assignments_tenant_learner_idx').on(table.tenantId, table.learnerId),
   identityStatusIdx: index('training_assignments_identity_status_idx').on(table.tenantId, table.learnerId, table.trainingVersionId, table.status),
+}));
+
+export const trainingAssignmentOriginType = pgEnum('training_assignment_origin_type', ['DIRECT', 'AUDIENCE_RESOLUTION']);
+
+/**
+ * Learning-owned immutable provenance. Multiple origins may point to the same
+ * assignment so an already-active assignment can retain both its original
+ * reason and later confirmed audience resolutions that semantically reuse it.
+ */
+export const trainingAssignmentOrigins = pgTable('training_assignment_origins', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'restrict' }),
+  assignmentId: uuid('assignment_id').notNull().references(() => trainingAssignments.id, { onDelete: 'restrict' }),
+  originType: trainingAssignmentOriginType('origin_type').notNull(),
+  originKey: text('origin_key').notNull(),
+  sourceRefId: text('source_ref_id'),
+  sourceFingerprint: text('source_fingerprint'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  assignmentOriginUnique: uniqueIndex('training_assignment_origins_assignment_origin_uq').on(table.tenantId, table.assignmentId, table.originKey),
+  sourceLookupIdx: index('training_assignment_origins_source_idx').on(table.tenantId, table.originType, table.sourceRefId),
+  shape: check('training_assignment_origins_shape_ck', sql`(
+    (${table.originType} = 'DIRECT' and ${table.sourceRefId} is null and ${table.sourceFingerprint} is null and ${table.originKey} = 'DIRECT') or
+    (${table.originType} = 'AUDIENCE_RESOLUTION' and ${table.sourceRefId} is not null and ${table.sourceFingerprint} is not null and ${table.originKey} = ('AUDIENCE_RESOLUTION:' || ${table.sourceRefId}))
+  )`),
 }));
 
 export const learningEvidence = pgTable('learning_evidence', {
