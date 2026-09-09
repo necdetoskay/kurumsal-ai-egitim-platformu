@@ -12,6 +12,7 @@ export class AudienceAssignmentWorkflowError extends Error {
   constructor(public readonly code:
     | 'HANDOFF_SCOPE_MISMATCH'
     | 'INVALID_RESOLUTION_FINGERPRINT'
+    | 'IDEMPOTENCY_KEY_REQUIRED'
     | 'LEARNER_SCOPE_MISMATCH'
     | 'LEARNER_NOT_ACTIVE'
     | 'ASSIGNMENT_ID_COLLISION') {
@@ -61,6 +62,7 @@ export interface AudienceAssignmentWorkflowInput {
 
 function assertHandoffScope(input: AudienceAssignmentWorkflowInput): void {
   const { handoff } = input;
+  if (!input.idempotencyKey.trim()) throw new AudienceAssignmentWorkflowError('IDEMPOTENCY_KEY_REQUIRED');
   if (
     handoff.tenantId !== input.tenantId ||
     handoff.trainingId !== input.trainingId ||
@@ -127,10 +129,15 @@ export function bindConfirmedAudienceToAssignments(
           assignedAt: input.assignedAt,
         };
 
-        const idCollision = assignments.find((item) => item.id === candidate.id && !sameAssignmentIdentity(item, candidate));
-        if (idCollision) throw new AudienceAssignmentWorkflowError('ASSIGNMENT_ID_COLLISION');
-
         const resolved = resolveAssignment(assignments, candidate);
+        const existingIdOwner = assignments.find((item) => item.id === candidate.id);
+        if (resolved === candidate && existingIdOwner) {
+          throw new AudienceAssignmentWorkflowError('ASSIGNMENT_ID_COLLISION');
+        }
+        if (existingIdOwner && resolved !== existingIdOwner && !sameAssignmentIdentity(existingIdOwner, candidate)) {
+          throw new AudienceAssignmentWorkflowError('ASSIGNMENT_ID_COLLISION');
+        }
+
         const existed = assignments.some((item) => item.id === resolved.id);
         if (existed) {
           reusedAssignmentIds.push(resolved.id);
