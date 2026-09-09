@@ -18,7 +18,7 @@
 
 The V1 purpose requires the learner to receive an assignment, consume training, resume progress, complete assessment, see result/retake/certificate and consume bounded learning insight. The learner experience issue remains a direct blocker and current `main` web surfaces contain substantial shell/state-contract behavior rather than a fully demonstrated real API/DB flow.
 
-**Required action:** Prioritize #48 and prove `assignment -> learning -> resume -> assessment -> result -> certificate` through real persistence and browser/API qualification.
+**Required action:** Prioritize #48 after baseline reconciliation and prove `assignment -> learning -> resume -> assessment -> result -> certificate` through real persistence and browser/API qualification.
 
 ---
 
@@ -33,14 +33,16 @@ The product vision differentiates itself from a classic LMS through Learning Obj
 
 ---
 
-### MUR-003 — Organization Management has expanded beyond its V1 purpose boundary
+### MUR-003 — Top-level V1 scope and Organization module freeze disagree on enterprise integrations
 
 **Severity:** HIGH  
-**Type:** Scope drift
+**Type:** Scope/change-control inconsistency
 
-Canonical scope states V1 is not a full HR system and broad enterprise HR integrations are Later. Organization Management expanded into temporal employment, external identities, imports, AD/LDAP and HR/ERP adapter contracts. These capabilities are implemented on the Organization canonical branch, so MUR must rescope rather than pretend the work does not exist.
+The Organization architecture itself is not a full-HRIS design: it explicitly excludes payroll, compensation, leave/attendance, performance appraisal, recruitment and full HRIS replacement. Its training-targeting boundary is well separated from Training ownership.
 
-**Required action:** Preserve working organization/audience/history/audit foundations. Do not remove already useful code merely to reduce scope. Freeze further HR/ERP expansion; treat HR/ERP and broad AD/LDAP ecosystem work as deferred unless a V1 deployment dependency proves otherwise.
+The inconsistency is narrower but real: top-level `SCOPE.md` places broad enterprise HR integrations in Later, while the Organization canonical design includes AD/LDAP/HR/ERP-ready integration architecture and Phase 5 implemented bounded import/integration contracts.
+
+**Required action:** Preserve accepted/working integration contracts. Do not remove them merely to make the documents look smaller. Explicitly amend top-level scope/change-control truth: existing bounded contracts are accepted foundation; **further productization/connector ecosystem expansion is deferred** unless required by a concrete V1 deployment.
 
 ---
 
@@ -51,31 +53,33 @@ Canonical scope states V1 is not a full HR system and broad enterprise HR integr
 
 Phase 6 #68 is completed on `design/organization-management-canonical-v1`. PR #104 merged into that branch and implements typed audience persistence, deterministic resolution, overlap deduplication, stable fingerprint/snapshot, explicit unlinked Employee -> User handling, preview and idempotent confirm/handoff. The branch is currently ahead of `main`, so the mission-critical bridge exists but is not part of the inspected default product baseline.
 
-**Required action:** Integrate/rebase/qualify the Organization canonical branch against the chosen V1 baseline before reimplementing audience functionality. Do not duplicate #68.
+**Required action:** Integrate/rebase/qualify the Organization canonical branch against `main` before reimplementing audience functionality. Do not duplicate #68.
 
 ---
 
-### MUR-005 — Multiple roadmap baselines describe incompatible sprint numbering/order
+### MUR-005 — Legacy roadmap looked active beside the canonical backend-first roadmap
 
-**Severity:** HIGH  
+**Severity:** HIGH -> MITIGATED IN PR #106  
 **Type:** Canonical governance drift
 
-`docs/10-sprints/BACKEND_FIRST_SPRINT_ROADMAP_V1.md` and `docs/18-sprints/SPRINT_ROADMAP_V1.md` describe materially different sprint order/meaning. Both appear authoritative enough to guide implementation.
+`docs/10-sprints/BACKEND_FIRST_SPRINT_ROADMAP_V1.md` and `docs/18-sprints/SPRINT_ROADMAP_V1.md` described materially different sprint order/meaning. `DESIGN_FREEZE_v1.md` already identified the Backend-First roadmap as canonical, so the ambiguity was documentation governance rather than an unresolved architecture decision.
 
-**Risk:** Coding agents and maintainers can choose different “canonical” next steps.
+**Mitigation:** PR #106 marks `docs/18-sprints/SPRINT_ROADMAP_V1.md` as `SUPERSEDED / HISTORICAL BASELINE` and updates `START_HERE.md` to point coding agents to the Backend-First roadmap plus the AEGIS MUR recovery overlay.
 
-**Required action:** Select one canonical V1 execution roadmap; mark the other superseded/historical or explicitly subordinate it. The MUR Recovery Roadmap should govern immediate realignment until reconciliation is merged.
+**Closure evidence required:** merge PR #106.
 
 ---
 
-### MUR-006 — Design Freeze status and implementation history are inconsistent
+### MUR-006 — Design Freeze status and implementation history were inconsistent
 
-**Severity:** HIGH  
+**Severity:** HIGH -> MITIGATED IN PR #106  
 **Type:** Governance drift
 
-`DESIGN_FREEZE_v1.md` on `main` still identifies itself as `Design Freeze Candidate`, while many implementation sprints have proceeded and the Organization canonical branch contains its own traceability/design-freeze package.
+Global `DESIGN_FREEZE_v1.md` was still labelled `Design Freeze Candidate` even though implementation proceeded. The Organization-specific freeze document also uses candidate wording while later declaring the design frozen for implementation.
 
-**Required action:** Reconcile Design Freeze status/version only after selecting the baseline branch and canonical roadmap. The freeze statement must identify exactly which commit/document set it freezes.
+**Mitigation:** PR #106 amends global Design Freeze to `ACTIVE BASELINE — LIMITED REOPEN UNDER AEGIS MUR #105`, declares `main` the release baseline, preserves hard invariants, and limits the reopened scope to mission/governance reconciliation.
+
+**Remaining:** when Organization canonical work is promoted, reconcile the Organization-specific freeze artifact as part of the promotion PR.
 
 ---
 
@@ -88,7 +92,7 @@ Investigation found `design/organization-management-canonical-v1` ahead of `main
 
 **Risk:** `main` says one thing while active/closed issues and the Organization branch say another. Agents starting from the default branch cannot reconstruct the actual project state.
 
-**Required action:** Decide whether `design/organization-management-canonical-v1` is to be promoted into the V1 baseline. If yes, integrate it via a reviewed PR/rebase strategy and run full regression/MUR qualification. If no, explicitly mark it experimental/historical and reconcile all issues that treated it as canonical.
+**Required action:** Use `main` as the single V1 release baseline and treat `design/organization-management-canonical-v1` as an integration source. Review the 34-commit delta against MUR, qualify it, then promote accepted work via reviewed PR.
 
 ---
 
@@ -149,6 +153,19 @@ Role switching, demo sessions and state selectors are useful for UI qualificatio
 
 **Required action:** Keep demo/characterization surfaces only where clearly marked; production E2E must use real auth/session/API/persistence.
 
+---
+
+### MUR-013 — Project entry-point documentation was stale
+
+**Severity:** MEDIUM -> MITIGATED IN PR #106  
+**Type:** Discoverability / canonical truth
+
+`START_HERE.md` pointed to many directory names from an older documentation layout, making a clean checkout misleading to new agents.
+
+**Mitigation:** PR #106 replaces the stale reading order with current canonical paths, identifies the Backend-First roadmap, the MUR overlay, `main` release baseline and Organization integration source.
+
+**Closure evidence required:** merge PR #106.
+
 ## Decision register
 
 | Decision | Status |
@@ -156,14 +173,15 @@ Role switching, demo sessions and state selectors are useful for UI qualificatio
 | No full rewrite | ACCEPTED |
 | Preserve domain-first architecture | ACCEPTED |
 | Preserve security/tenant/immutability hard gates | ACCEPTED |
+| `main` is the single V1 release baseline | ACCEPTED in MUR proposal |
+| Organization canonical branch is an integration source, not a second release baseline | ACCEPTED in MUR proposal |
 | Do not duplicate completed Organization audience work | ACCEPTED |
-| Freeze new V1 scope during MUR recovery | ACCEPTED for review branch |
-| Rescope further Organization Management expansion to learning-purpose boundary | PROPOSED / requires merge acceptance |
-| Defer further HR/ERP adapter ecosystem expansion from V1 | PROPOSED / requires merge acceptance |
+| Preserve already implemented bounded enterprise-integration contracts | ACCEPTED |
+| Freeze further HR/ERP/AD ecosystem expansion during recovery | PROPOSED / requires merge acceptance |
 | Promote Learner Experience + Learning Insight as mission blockers | PROPOSED / requires merge acceptance |
 | Add Mission E2E release gate | PROPOSED / requires implementation |
-| Reconcile `main` vs Organization canonical branch | REQUIRED |
-| Reconcile roadmap and Design Freeze | REQUIRED |
+| Backend-First roadmap is canonical; docs/18 roadmap is historical | RESOLVED in PR #106 pending merge |
+| Global Design Freeze gets limited MUR reopen amendment | RESOLVED in PR #106 pending merge |
 
 ## Closure rule for findings
 
