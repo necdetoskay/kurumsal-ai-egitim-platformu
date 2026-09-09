@@ -16,6 +16,9 @@ export const trainingAssignments = pgTable('training_assignments', {
 }, (table) => ({
   tenantLearnerIdx: index('training_assignments_tenant_learner_idx').on(table.tenantId, table.learnerId),
   identityStatusIdx: index('training_assignments_identity_status_idx').on(table.tenantId, table.learnerId, table.trainingVersionId, table.status),
+  activeIdentityUnique: uniqueIndex('training_assignments_active_identity_uq')
+    .on(table.tenantId, table.learnerId, table.trainingId, table.trainingVersionId)
+    .where(sql`${table.status} = 'ACTIVE'`),
 }));
 
 export const trainingAssignmentOriginType = pgEnum('training_assignment_origin_type', ['DIRECT', 'AUDIENCE_RESOLUTION']);
