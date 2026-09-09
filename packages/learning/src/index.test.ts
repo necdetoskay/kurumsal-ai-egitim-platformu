@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   certificateEligibilityKey,
+  createAssignmentOrigin,
   evaluateCompletion,
   issueCertificate,
   resolveAssignment,
+  resolveAssignmentOrigin,
   revokeCertificate,
   type Certificate,
   type LearningEvidence,
@@ -24,6 +26,29 @@ function evidence(overrides: Partial<LearningEvidence>): LearningEvidence {
 describe('learning progress and certification invariants', () => {
   it('resolves duplicate active assignment idempotently', () => {
     expect(resolveAssignment([assignment], { ...assignment, id: 'a2' }).id).toBe('a1');
+  });
+
+  it('preserves multiple immutable reasons for the same assignment without duplicating a source', () => {
+    const direct = createAssignmentOrigin({
+      id: 'origin-direct', tenantId: 't1', assignmentId: 'a1', originType: 'DIRECT', createdAt: new Date('2026-01-01'),
+    });
+    const audience = createAssignmentOrigin({
+      id: 'origin-audience', tenantId: 't1', assignmentId: 'a1', originType: 'AUDIENCE_RESOLUTION',
+      sourceRefId: 'resolution-1', sourceFingerprint: 'a'.repeat(64), createdAt: new Date('2026-01-02'),
+    });
+
+    expect(resolveAssignmentOrigin([direct], audience)).toBe(audience);
+    expect(resolveAssignmentOrigin([direct, audience], { ...audience, id: 'origin-replay' })).toBe(audience);
+    expect(() => resolveAssignmentOrigin([audience], { ...audience, id: 'origin-conflict', sourceFingerprint: 'b'.repeat(64) })).toThrow('CONFLICT');
+  });
+
+  it('requires audience origin reference and fingerprint while direct origin stays source-free', () => {
+    expect(() => createAssignmentOrigin({
+      id: 'bad', tenantId: 't1', assignmentId: 'a1', originType: 'AUDIENCE_RESOLUTION', createdAt: new Date('2026-01-01'),
+    })).toThrow('VALIDATION_FAILED');
+    expect(() => createAssignmentOrigin({
+      id: 'bad-direct', tenantId: 't1', assignmentId: 'a1', originType: 'DIRECT', sourceRefId: 'unexpected', createdAt: new Date('2026-01-01'),
+    })).toThrow('VALIDATION_FAILED');
   });
 
   it('requires module and assessment evidence for completion', () => {
