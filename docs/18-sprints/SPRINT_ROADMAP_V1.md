@@ -1,6 +1,12 @@
 # V1 Sprint Roadmap
 
-## Amaç
+**Status:** SUPERSEDED / HISTORICAL BASELINE  
+**Canonical execution order:** `docs/10-sprints/BACKEND_FIRST_SPRINT_ROADMAP_V1.md`  
+**Reason:** `DESIGN_FREEZE_v1.md` explicitly defines the Backend-First Sprint Roadmap as the canonical implementation order. This document is retained for historical traceability and must not be used by coding agents to select the next V1 sprint.
+
+> AEGIS MUR note (2026-09-09): This file previously looked active while describing a materially different sprint numbering/order. It is now retained only as historical planning context. The immediate recovery sequence is documented in `docs/13-governance/aegis-mur/RECOVERY_ROADMAP_V1.md`.
+
+## Historical purpose
 
 Tasarım kararlarını kontrollü şekilde çalışan ürüne dönüştürmek. Sprint sırası dependency-first ve AI-first yaklaşımı birlikte gözetir.
 
