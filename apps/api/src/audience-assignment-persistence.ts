@@ -1,4 +1,4 @@
-import type { DatabaseClient } from '@kaep/db';
+import type { DatabaseClient, DatabasePoolClient } from '@kaep/db';
 
 export const AUDIENCE_ASSIGNMENT_OPERATION = 'CONFIRM_AUDIENCE_ASSIGNMENTS';
 
@@ -45,7 +45,7 @@ export interface AudienceAssignmentPersistenceHooks {
   afterAssignmentPersisted?: (persistedCount: number) => void | Promise<void>;
 }
 
-type PgClient = Awaited<ReturnType<DatabaseClient['pool']['connect']>>;
+type PgClient = DatabasePoolClient;
 
 interface IdempotencyRow {
   resource_id: string;
@@ -144,8 +144,6 @@ async function claimIdempotency(
   );
   if (claimed.rowCount) return null;
 
-  // A concurrent transaction may have won the unique-key race. The INSERT above
-  // waits for that transaction, so a committed semantic result must now exist.
   const raced = await client.query<IdempotencyRow>(
     `select resource_id, result_ref
        from command_idempotency
@@ -386,7 +384,6 @@ export async function persistConfirmedAudienceAssignments(
     try {
       await client.query('rollback');
     } catch {
-      // Preserve the original transaction failure.
     }
     throw error;
   } finally {
