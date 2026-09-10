@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { check, foreignKey, index, jsonb, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { check, foreignKey, index, jsonb, pgEnum, pgTable, text, timestamp, unique, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 import { tenants, users } from './schema.js';
 import { trainingVersions, trainings } from './training-schema.js';
 
@@ -14,7 +14,7 @@ export const trainingAssignments = pgTable('training_assignments', {
   completedAt: timestamp('completed_at', { withTimezone: true }),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => ({
-  tenantIdentityUnique: uniqueIndex('training_assignments_tenant_id_uq').on(table.tenantId, table.id),
+  tenantIdentityUnique: unique('training_assignments_tenant_id_uq').on(table.tenantId, table.id),
   tenantLearnerIdx: index('training_assignments_tenant_learner_idx').on(table.tenantId, table.learnerId),
   identityStatusIdx: index('training_assignments_identity_status_idx').on(table.tenantId, table.learnerId, table.trainingVersionId, table.status),
   activeIdentityUnique: uniqueIndex('training_assignments_active_identity_uq')
