@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
-import { Pool } from 'pg';
+import { Pool, type PoolClient } from 'pg';
 
 export function createDatabase(databaseUrl: string) {
   const pool = new Pool({ connectionString: databaseUrl });
@@ -18,4 +18,5 @@ export function createDatabase(databaseUrl: string) {
 }
 
 export type DatabaseClient = ReturnType<typeof createDatabase>;
+export type DatabasePoolClient = PoolClient;
 export * from './tenant-scope.js';
