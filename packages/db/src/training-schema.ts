@@ -1,4 +1,4 @@
-import { index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { foreignKey, index, integer, jsonb, pgTable, text, timestamp, unique, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 import { tenants } from './schema.js';
 
 export const trainings = pgTable('trainings', {
@@ -11,6 +11,7 @@ export const trainings = pgTable('trainings', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => ({
+  tenantIdIdUq: unique('trainings_tenant_id_id_uq').on(table.tenantId, table.id),
   tenantStatusIdx: index('trainings_tenant_status_idx').on(table.tenantId, table.status),
 }));
 
@@ -42,12 +43,19 @@ export const trainingModules = pgTable('training_modules', {
 export const trainingVersions = pgTable('training_versions', {
   id: uuid('id').defaultRandom().primaryKey(),
   tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
-  trainingId: uuid('training_id').notNull().references(() => trainings.id),
+  trainingId: uuid('training_id').notNull(),
   version: integer('version').notNull(),
   snapshot: jsonb('snapshot').notNull(),
   publishedAt: timestamp('published_at', { withTimezone: true }).notNull(),
 }, (table) => ({
+  trainingScopeFk: foreignKey({
+    name: 'training_versions_tenant_training_fk',
+    columns: [table.tenantId, table.trainingId],
+    foreignColumns: [trainings.tenantId, trainings.id],
+  }).onDelete('restrict'),
   tenantTrainingVersionUnique: uniqueIndex('training_versions_tenant_training_version_uq').on(table.tenantId, table.trainingId, table.version),
+  tenantTrainingIdUq: unique('training_versions_tenant_training_id_uq').on(table.tenantId, table.trainingId, table.id),
+  tenantIdIdUq: unique('training_versions_tenant_id_id_uq').on(table.tenantId, table.id),
 }));
 
 export const commandIdempotency = pgTable('command_idempotency', {

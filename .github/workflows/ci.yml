@@ -50,6 +50,8 @@ jobs:
       - run: pnpm build
       - run: pnpm db:generate
       - run: pnpm db:migrate
+      - name: M1 PostgreSQL integration
+        run: pnpm --filter @kaep/api test:db
       - name: Readiness smoke
         run: |
           pnpm --filter @kaep/api dev > /tmp/kaep-api.log 2>&1 &

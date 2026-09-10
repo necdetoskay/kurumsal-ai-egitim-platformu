@@ -1,429 +1,501 @@
-# Organization Management Data Model — V1
+# Organization Management Data Model V1
 
-Status: Proposed canonical contract
-Date: 2026-08-27
-Scope: Organization, company, department, employee, employment, position, groups, access scope, integrations and audit
+**Status:** CANONICAL DRAFT  
+**Version:** 1.0  
+**Bounded Context:** Organization Management  
+**Depends on:** `docs/01-intent/ORGANIZATION_MANAGEMENT_INTENT_V1.md`, `docs/06-architecture/ORGANIZATION_MANAGEMENT_ARCHITECTURE_V1.md`
 
 ## 1. Purpose
 
-This document defines the relational data contract for organization management in the corporate training platform.
+This document defines the canonical relational data model for Organization Management. It fixes entity boundaries, PK/FK rules, uniqueness constraints, temporal-history rules, indexes, lifecycle behavior, and delete semantics before API and implementation work.
 
-The model must support:
-- multiple companies under one organization,
-- hierarchical departments,
-- employee movement history,
-- manual and future dynamic groups,
-- training targeting at organization/company/department/group/employee level,
-- scoped administration,
-- external HR/AD/LDAP identities,
-- auditable changes.
+Canonical hierarchy:
 
-## 2. Tenant vs Organization
+`Tenant -> Organization -> Company -> Department Tree`
 
-`tenant` and `organization` are intentionally different concepts.
+Canonical person placement model:
 
-- `tenant`: technical isolation/security boundary of the SaaS platform.
-- `organization`: business-level customer organization/holding/group.
+`Employee -> Employment -> Company / Department / Position / Location`
 
-V1 may commonly have one organization per tenant, but the schema does not depend on them being the same concept.
+Groups are orthogonal to hierarchy:
 
-```text
-tenant
-  └── organization
-        ├── company
-        │    ├── department tree
-        │    └── employment ── employee
-        ├── positions
-        ├── groups ── group_memberships ── employee
-        ├── users / scoped roles
-        └── audit events
-```
+`Group <-> GroupMembership <-> Employee`
 
-## 3. Core Tables
+## 2. Global conventions
 
-### 3.1 organizations
+- Primary keys use UUID.
+- Business tables are tenant-scoped.
+- Tenant identity is resolved from authenticated context, never trusted from arbitrary client input.
+- Timestamps are stored in UTC.
+- Historical relationships use temporal validity rather than destructive overwrite.
+- Hard delete is prohibited after historical training, assignment, completion, reporting, audit, or dependent organization data exists.
+- Codes are normalized and unique in the smallest valid business scope.
+- Foreign keys must never cross tenant boundaries.
+- Aggregate counters shown in UI are projections, not mutable source-of-truth columns.
 
-Business-level top boundary.
+## 3. Core tables
 
-| Column | Type | Key / Rule |
+### 3.1 `organizations`
+
+| Column | Type | Rule |
 |---|---|---|
 | id | uuid | PK |
-| tenant_id | uuid | FK -> tenants.id |
-| name | varchar(200) | NOT NULL |
-| code | varchar(64) | NOT NULL |
-| status | varchar(24) | ACTIVE, PASSIVE |
-| created_at | timestamptz | NOT NULL |
-| updated_at | timestamptz | NOT NULL |
+| tenant_id | uuid | FK -> tenants.id, required |
+| name | varchar(200) | required |
+| code | varchar(50) | required |
+| sector | varchar(120) | nullable |
+| default_locale | varchar(20) | required |
+| timezone | varchar(64) | required |
+| status | enum | ACTIVE / PASSIVE |
+| description | text | nullable |
+| created_at | timestamptz | required |
+| updated_at | timestamptz | required |
 
 Constraints:
-- UNIQUE `(tenant_id, code)`
-- tenant scope is mandatory for every organization query.
+- `UNIQUE (tenant_id, code)`
+- tenant consistency is mandatory for all dependent entities.
 
-### 3.2 companies
+Indexes:
+- `(tenant_id, status)`
+- `(tenant_id, lower(name))`
 
-A legal or operational company under an organization.
+### 3.2 `companies`
 
-| Column | Type | Key / Rule |
+| Column | Type | Rule |
 |---|---|---|
 | id | uuid | PK |
-| tenant_id | uuid | FK -> tenants.id |
-| organization_id | uuid | FK -> organizations.id |
-| name | varchar(200) | NOT NULL |
-| legal_name | varchar(255) | NULL |
-| code | varchar(64) | NOT NULL |
-| tax_number | varchar(32) | NULL |
-| status | varchar(24) | ACTIVE, PASSIVE |
-| created_at | timestamptz | NOT NULL |
-| updated_at | timestamptz | NOT NULL |
+| tenant_id | uuid | FK -> tenants.id, required |
+| organization_id | uuid | FK -> organizations.id, required |
+| name | varchar(200) | required |
+| legal_name | varchar(250) | nullable |
+| code | varchar(50) | required |
+| tax_number | varchar(50) | nullable |
+| email | varchar(254) | nullable |
+| phone | varchar(50) | nullable |
+| website | varchar(255) | nullable |
+| status | enum | ACTIVE / PASSIVE |
+| created_at | timestamptz | required |
+| updated_at | timestamptz | required |
 
 Constraints:
-- UNIQUE `(organization_id, code)`
-- referenced organization must belong to the same tenant.
+- `UNIQUE (tenant_id, organization_id, code)`
+- company tenant must equal organization tenant.
 
-### 3.3 departments
+Indexes:
+- `(tenant_id, organization_id, status)`
+- `(tenant_id, lower(name))`
 
-Recursive department/unit tree inside a company.
+Delete behavior:
+- organization FK: RESTRICT
+- hard delete prohibited after dependent data exists.
 
-| Column | Type | Key / Rule |
+### 3.3 `departments`
+
+Recursive company-local hierarchy.
+
+| Column | Type | Rule |
 |---|---|---|
 | id | uuid | PK |
-| tenant_id | uuid | FK -> tenants.id |
-| company_id | uuid | FK -> companies.id |
-| parent_department_id | uuid | FK -> departments.id, NULL allowed |
-| name | varchar(200) | NOT NULL |
-| code | varchar(64) | NOT NULL |
-| status | varchar(24) | ACTIVE, PASSIVE |
-| sort_order | integer | default 0 |
-| created_at | timestamptz | NOT NULL |
-| updated_at | timestamptz | NOT NULL |
+| tenant_id | uuid | FK -> tenants.id, required |
+| company_id | uuid | FK -> companies.id, required |
+| parent_department_id | uuid | FK -> departments.id, nullable |
+| name | varchar(200) | required |
+| code | varchar(50) | required |
+| description | text | nullable |
+| sort_order | int | default 0 |
+| status | enum | ACTIVE / PASSIVE |
+| created_at | timestamptz | required |
+| updated_at | timestamptz | required |
 
 Constraints:
-- UNIQUE `(company_id, code)`
-- parent department must belong to the same company and tenant.
-- a department cannot be its own parent.
-- recursive cycle creation must be prevented at service/domain level and tested.
-- departments with historical references are never hard-deleted; use `PASSIVE`.
+- `UNIQUE (tenant_id, company_id, code)`
+- `CHECK (parent_department_id <> id)`
+- parent must belong to same tenant and company.
+- recursive cycles are prohibited and must be validated transactionally.
 
-### 3.4 employees
+Indexes:
+- `(tenant_id, company_id, parent_department_id)`
+- `(tenant_id, company_id, status)`
+- `(tenant_id, company_id, lower(name))`
 
-Represents the person, independent from current company/department assignment.
+Delete behavior:
+- hard delete prohibited after reference.
+- active descendants prevent destructive removal.
 
-| Column | Type | Key / Rule |
+### 3.4 `employees`
+
+Represents the person, not the current organizational placement and not the login account.
+
+| Column | Type | Rule |
 |---|---|---|
 | id | uuid | PK |
-| tenant_id | uuid | FK -> tenants.id |
-| organization_id | uuid | FK -> organizations.id |
-| employee_no | varchar(64) | NULL |
-| first_name | varchar(120) | NOT NULL |
-| last_name | varchar(120) | NOT NULL |
-| email | varchar(255) | NULL |
-| phone | varchar(64) | NULL |
-| hire_date | date | NULL |
-| termination_date | date | NULL |
-| status | varchar(24) | ACTIVE, PASSIVE, TERMINATED |
-| created_at | timestamptz | NOT NULL |
-| updated_at | timestamptz | NOT NULL |
+| tenant_id | uuid | FK -> tenants.id, required |
+| organization_id | uuid | FK -> organizations.id, required |
+| employee_no | varchar(80) | nullable |
+| first_name | varchar(120) | required |
+| last_name | varchar(120) | required |
+| email | varchar(254) | nullable |
+| phone | varchar(50) | nullable |
+| birth_date | date | nullable |
+| hire_date | date | nullable |
+| termination_date | date | nullable |
+| status | enum | ACTIVE / PASSIVE / TERMINATED |
+| created_at | timestamptz | required |
+| updated_at | timestamptz | required |
 
-Recommended constraints:
-- UNIQUE `(organization_id, employee_no)` where `employee_no IS NOT NULL`.
-- normalized email uniqueness should only be enforced if customer identity rules require it.
+Constraints:
+- employee tenant must equal organization tenant.
+- partial unique: `(tenant_id, organization_id, employee_no)` where employee_no is not null.
+- e-mail uniqueness is intentionally not globally enforced until HR identity policy is fixed.
 
-Important:
-- `company_id` and `department_id` do not live on this table.
-- organizational placement belongs to `employments`.
+Indexes:
+- `(tenant_id, organization_id, status)`
+- `(tenant_id, organization_id, employee_no)`
+- `(tenant_id, lower(last_name), lower(first_name))`
+- partial `(tenant_id, lower(email))` where email is not null.
 
-### 3.5 positions
+### 3.5 `positions`
 
-Normalized title/position catalog.
-
-| Column | Type | Key / Rule |
+| Column | Type | Rule |
 |---|---|---|
 | id | uuid | PK |
-| tenant_id | uuid | FK -> tenants.id |
-| organization_id | uuid | FK -> organizations.id |
-| name | varchar(160) | NOT NULL |
-| code | varchar(64) | NOT NULL |
-| level | integer | NULL |
+| tenant_id | uuid | FK -> tenants.id, required |
+| organization_id | uuid | FK -> organizations.id, required |
+| name | varchar(160) | required |
+| code | varchar(50) | required |
+| level | int | nullable |
 | is_managerial | boolean | default false |
-| status | varchar(24) | ACTIVE, PASSIVE |
-| created_at | timestamptz | NOT NULL |
-| updated_at | timestamptz | NOT NULL |
+| status | enum | ACTIVE / PASSIVE |
+| description | text | nullable |
+| created_at | timestamptz | required |
+| updated_at | timestamptz | required |
 
-Constraint:
-- UNIQUE `(organization_id, code)`.
+Constraints:
+- `UNIQUE (tenant_id, organization_id, code)`
 
-### 3.6 locations
+Indexes:
+- `(tenant_id, organization_id, status)`
+- `(tenant_id, organization_id, is_managerial)`
 
-Physical work locations; not the same concept as department.
+### 3.6 `locations`
 
-| Column | Type | Key / Rule |
+Physical/operational work location; distinct from department.
+
+| Column | Type | Rule |
 |---|---|---|
 | id | uuid | PK |
-| tenant_id | uuid | FK -> tenants.id |
-| organization_id | uuid | FK -> organizations.id |
-| company_id | uuid | FK -> companies.id, NULL allowed |
-| name | varchar(200) | NOT NULL |
-| location_type | varchar(40) | HQ, OFFICE, SITE, WAREHOUSE, FACTORY, REGION, OTHER |
-| address | text | NULL |
-| status | varchar(24) | ACTIVE, PASSIVE |
-| created_at | timestamptz | NOT NULL |
-| updated_at | timestamptz | NOT NULL |
+| tenant_id | uuid | FK -> tenants.id, required |
+| organization_id | uuid | FK -> organizations.id, required |
+| company_id | uuid | FK -> companies.id, nullable |
+| name | varchar(180) | required |
+| code | varchar(50) | required |
+| location_type | enum | OFFICE / SITE / WAREHOUSE / FACTORY / REGION / OTHER |
+| country | varchar(80) | nullable |
+| city | varchar(120) | nullable |
+| district | varchar(120) | nullable |
+| address | text | nullable |
+| status | enum | ACTIVE / PASSIVE |
+| created_at | timestamptz | required |
+| updated_at | timestamptz | required |
 
-### 3.7 employments
+Constraints:
+- `UNIQUE (tenant_id, organization_id, code)`
+- company, if set, must belong to same organization and tenant.
 
-Historical placement of an employee in company/department/position/location.
+Indexes:
+- `(tenant_id, organization_id, status)`
+- `(tenant_id, company_id, location_type)`
 
-| Column | Type | Key / Rule |
+### 3.7 `employments`
+
+Temporal employee placement.
+
+| Column | Type | Rule |
 |---|---|---|
 | id | uuid | PK |
-| tenant_id | uuid | FK -> tenants.id |
-| employee_id | uuid | FK -> employees.id |
-| company_id | uuid | FK -> companies.id |
-| department_id | uuid | FK -> departments.id, NULL allowed |
-| position_id | uuid | FK -> positions.id, NULL allowed |
-| location_id | uuid | FK -> locations.id, NULL allowed |
-| manager_employment_id | uuid | FK -> employments.id, NULL allowed |
-| employment_type | varchar(40) | FULL_TIME, PART_TIME, CONTRACTOR, INTERN, OTHER |
-| start_date | date | NOT NULL |
-| end_date | date | NULL |
+| tenant_id | uuid | FK -> tenants.id, required |
+| employee_id | uuid | FK -> employees.id, required |
+| company_id | uuid | FK -> companies.id, required |
+| department_id | uuid | FK -> departments.id, nullable |
+| position_id | uuid | FK -> positions.id, nullable |
+| location_id | uuid | FK -> locations.id, nullable |
+| manager_employment_id | uuid | FK -> employments.id, nullable |
+| employment_type | enum | FULL_TIME / PART_TIME / CONTRACTOR / INTERN / OTHER |
+| start_date | date | required |
+| end_date | date | nullable |
 | is_primary | boolean | default true |
-| status | varchar(24) | ACTIVE, ENDED |
-| created_at | timestamptz | NOT NULL |
-| updated_at | timestamptz | NOT NULL |
+| status | enum | ACTIVE / CLOSED |
+| created_at | timestamptz | required |
+| updated_at | timestamptz | required |
 
-Rules:
-- department must belong to `company_id`.
-- position/location must belong to the same tenant/organization.
-- employee must belong to the same organization.
-- changing company, department or position creates a new employment row; do not overwrite historical placement.
-- the old employment gets `end_date` and `ENDED`.
-- overlapping primary employments should be rejected unless explicitly allowed by a future policy.
-
-### 3.8 groups
-
-Cross-cutting training/audience groups independent from organization tree.
-
-| Column | Type | Key / Rule |
-|---|---|---|
-| id | uuid | PK |
-| tenant_id | uuid | FK -> tenants.id |
-| organization_id | uuid | FK -> organizations.id |
-| name | varchar(200) | NOT NULL |
-| description | text | NULL |
-| group_type | varchar(24) | MANUAL, DYNAMIC, SYSTEM |
-| status | varchar(24) | ACTIVE, PASSIVE |
-| created_by_user_id | uuid | FK -> users.id |
-| created_at | timestamptz | NOT NULL |
-| updated_at | timestamptz | NOT NULL |
-
-Constraint:
-- UNIQUE `(organization_id, name)` unless product later allows duplicate display names.
-
-### 3.9 group_memberships
-
-Historical many-to-many membership relation.
-
-| Column | Type | Key / Rule |
-|---|---|---|
-| id | uuid | PK |
-| tenant_id | uuid | FK -> tenants.id |
-| group_id | uuid | FK -> groups.id |
-| employee_id | uuid | FK -> employees.id |
-| source_type | varchar(24) | MANUAL, RULE, IMPORT, SYSTEM |
-| valid_from | timestamptz | NOT NULL |
-| valid_until | timestamptz | NULL |
-| added_by_user_id | uuid | FK -> users.id, NULL allowed |
-| created_at | timestamptz | NOT NULL |
-
-Rules:
-- membership removal sets `valid_until`; row is not deleted.
-- only one active membership for the same `(group_id, employee_id)` is allowed.
-- group and employee must belong to the same organization and tenant.
+Constraints:
+- `CHECK (end_date IS NULL OR end_date >= start_date)`
+- employee/company/department/position/location must resolve to same tenant and organization.
+- department must belong to selected company.
+- manager employment cannot reference itself.
+- one active primary employment per employee unless a future explicit multi-primary policy supersedes this rule.
 
 Recommended partial unique index:
-```sql
-CREATE UNIQUE INDEX uq_active_group_membership
-ON group_memberships (group_id, employee_id)
-WHERE valid_until IS NULL;
-```
+- `UNIQUE (tenant_id, employee_id) WHERE is_primary = true AND end_date IS NULL`
 
-### 3.10 dynamic_group_rules
+Temporal rule:
+- company/department/position movement closes the current employment and creates a new row.
+- past placement is never overwritten to simulate a move.
 
-Prepared for dynamic groups; UI may be postponed from first release.
+Indexes:
+- `(tenant_id, employee_id, start_date DESC)`
+- `(tenant_id, company_id, department_id, end_date)`
+- `(tenant_id, position_id, end_date)`
+- `(tenant_id, location_id, end_date)`
+- `(tenant_id, manager_employment_id, end_date)`
 
-| Column | Type | Key / Rule |
+### 3.8 `groups`
+
+| Column | Type | Rule |
 |---|---|---|
 | id | uuid | PK |
-| tenant_id | uuid | FK -> tenants.id |
-| group_id | uuid | FK -> groups.id |
-| field | varchar(120) | NOT NULL |
-| operator | varchar(40) | EQ, NEQ, IN, NOT_IN, GT, GTE, LT, LTE, CONTAINS |
-| value | jsonb | NOT NULL |
-| logical_operator | varchar(8) | AND, OR |
-| sort_order | integer | default 0 |
+| tenant_id | uuid | FK -> tenants.id, required |
+| organization_id | uuid | FK -> organizations.id, required |
+| name | varchar(180) | required |
+| code | varchar(50) | required |
+| group_type | enum | MANUAL / DYNAMIC / SYSTEM |
+| description | text | nullable |
+| status | enum | ACTIVE / PASSIVE |
+| created_by_user_id | uuid | nullable, Identity context reference |
+| created_at | timestamptz | required |
+| updated_at | timestamptz | required |
 
-V1 rule evaluation may be deferred, but schema ownership is reserved now.
+Constraints:
+- `UNIQUE (tenant_id, organization_id, code)`
 
-## 4. User Account Separation
+Indexes:
+- `(tenant_id, organization_id, group_type, status)`
+- `(tenant_id, organization_id, lower(name))`
+
+### 3.9 `group_memberships`
+
+Temporal many-to-many relation between group and employee.
+
+| Column | Type | Rule |
+|---|---|---|
+| id | uuid | PK |
+| tenant_id | uuid | FK -> tenants.id, required |
+| group_id | uuid | FK -> groups.id, required |
+| employee_id | uuid | FK -> employees.id, required |
+| source_type | enum | MANUAL / RULE / IMPORT / SYSTEM |
+| valid_from | timestamptz | required |
+| valid_until | timestamptz | nullable |
+| added_by_user_id | uuid | nullable |
+| source_reference | varchar(255) | nullable |
+| created_at | timestamptz | required |
+
+Constraints:
+- group and employee must belong to same tenant and organization.
+- `CHECK (valid_until IS NULL OR valid_until > valid_from)`
+- duplicate active membership is prohibited.
+
+Recommended partial unique index:
+- `UNIQUE (tenant_id, group_id, employee_id) WHERE valid_until IS NULL`
+
+Indexes:
+- `(tenant_id, employee_id, valid_until)`
+- `(tenant_id, group_id, valid_until)`
+- `(tenant_id, source_type)`
+
+Lifecycle:
+- removing a member sets `valid_until`; the row is not deleted.
+
+### 3.10 `dynamic_group_rules`
+
+Dynamic rules are versioned and declarative; arbitrary executable expressions are forbidden.
+
+| Column | Type | Rule |
+|---|---|---|
+| id | uuid | PK |
+| tenant_id | uuid | FK -> tenants.id, required |
+| group_id | uuid | FK -> groups.id, required |
+| rule_version | int | required |
+| expression | jsonb | normalized rule AST, required |
+| status | enum | DRAFT / ACTIVE / RETIRED |
+| created_at | timestamptz | required |
+| activated_at | timestamptz | nullable |
+
+Constraints:
+- only DYNAMIC groups can have active rules.
+- at most one ACTIVE rule version per group.
+
+Index:
+- `(tenant_id, group_id, status)`
+
+### 3.11 `employee_external_identities`
+
+Maps canonical employees to external HR/AD/LDAP/ERP identities.
+
+| Column | Type | Rule |
+|---|---|---|
+| id | uuid | PK |
+| tenant_id | uuid | FK -> tenants.id, required |
+| employee_id | uuid | FK -> employees.id, required |
+| provider | enum | MANUAL / CSV / LDAP / ACTIVE_DIRECTORY / HR_API / ERP |
+| external_id | varchar(255) | required |
+| external_username | varchar(255) | nullable |
+| last_sync_at | timestamptz | nullable |
+| metadata | jsonb | nullable |
+| created_at | timestamptz | required |
+| updated_at | timestamptz | required |
+
+Constraint:
+- `UNIQUE (tenant_id, provider, external_id)`
+
+Indexes:
+- `(tenant_id, employee_id)`
+- `(tenant_id, provider, external_username)`
+
+## 4. Identity / authorization boundary
 
 `Employee != User`.
 
-A person may exist in HR/training records without having an application login.
+Organization Management may reference Identity-context user IDs for actor, creator, and scoped authorization assignments but does not own login credentials.
 
-Add or preserve a nullable mapping:
+Canonical scoped-role bridge:
 
-```text
-users.employee_id -> employees.id
-```
+### `user_role_assignments`
 
-Rules:
-- one employee may have zero or one primary login in V1.
-- service/system accounts may have no employee.
-- employee lifecycle must not automatically delete the user audit identity.
+- `id uuid PK`
+- `tenant_id uuid`
+- `user_id uuid`
+- `role_id uuid`
+- `scope_type enum (TENANT, ORGANIZATION, COMPANY, DEPARTMENT)`
+- `organization_id uuid nullable`
+- `company_id uuid nullable`
+- `department_id uuid nullable`
+- `valid_from timestamptz`
+- `valid_until timestamptz nullable`
 
-## 5. Scoped Authorization
+Use explicit nullable FK columns rather than an unprotected generic `scope_id`. Exactly one scope matching `scope_type` must be populated, except TENANT scope where all three are null.
 
-Recommended role assignment structure:
+## 5. Training targeting bridge
 
-### user_role_assignments
+Training/assignment persistence must support typed audiences:
 
-| Column | Type | Key / Rule |
-|---|---|---|
-| id | uuid | PK |
-| tenant_id | uuid | FK -> tenants.id |
-| user_id | uuid | FK -> users.id |
-| role_id | uuid | FK -> roles.id |
-| scope_type | varchar(32) | TENANT, ORGANIZATION, COMPANY, DEPARTMENT |
-| organization_id | uuid | FK -> organizations.id, NULL |
-| company_id | uuid | FK -> companies.id, NULL |
-| department_id | uuid | FK -> departments.id, NULL |
-| created_at | timestamptz | NOT NULL |
-
-Use explicit nullable FKs rather than an unenforced generic `scope_id`, so database integrity remains available.
-
-Example:
-- COMPANY_ADMIN + `company_id = X`
-- HR_MANAGER + `organization_id = Y`
-- DEPARTMENT_MANAGER + `department_id = Z`
-
-## 6. External Employee Identities
-
-### employee_external_identities
-
-| Column | Type | Key / Rule |
-|---|---|---|
-| id | uuid | PK |
-| tenant_id | uuid | FK -> tenants.id |
-| employee_id | uuid | FK -> employees.id |
-| provider | varchar(40) | MANUAL, CSV, LDAP, ACTIVE_DIRECTORY, HR_API, ERP |
-| external_id | varchar(255) | NOT NULL |
-| external_username | varchar(255) | NULL |
-| last_sync_at | timestamptz | NULL |
-| raw_metadata | jsonb | NULL |
-| created_at | timestamptz | NOT NULL |
-
-Constraint:
-- UNIQUE `(tenant_id, provider, external_id)`.
-
-This enables the same employee to be linked to AD SID, HR personnel ID and future ERP identity without duplicating the employee record.
-
-## 7. Audit
-
-Use the existing platform audit mechanism. Organization-management changes must emit auditable events for at least:
-- company created/updated/passivated,
-- department created/moved/passivated,
-- employee created/updated/terminated,
-- employment started/ended,
-- group created/passivated,
-- group membership added/removed,
-- scoped role assignment changed,
-- external sync identity linked/unlinked.
-
-Audit payload must contain actor, tenant, target entity, timestamp and before/after or equivalent change evidence.
-
-## 8. Training Assignment Targeting
-
-Training targeting must support:
 - ORGANIZATION
 - COMPANY
 - DEPARTMENT
 - GROUP
 - EMPLOYEE
 
-Avoid a single unenforced `(target_type, target_id)` FK pair in the persistence model.
+Recommended relational structure: `training_assignment_audiences` with one nullable FK column per supported audience type plus a check constraint requiring exactly one matching target.
 
-Recommended relational structure:
+Target expansion must be snapshot/audit friendly so later organizational changes do not rewrite historical assignment/completion evidence.
 
-### training_assignment_audiences
+## 6. Audit
 
-| Column | Type | Key / Rule |
-|---|---|---|
-| id | uuid | PK |
-| tenant_id | uuid | FK -> tenants.id |
-| training_assignment_id | uuid | FK -> training_assignments.id |
-| audience_type | varchar(24) | ORGANIZATION, COMPANY, DEPARTMENT, GROUP, EMPLOYEE |
-| organization_id | uuid | FK -> organizations.id, NULL |
-| company_id | uuid | FK -> companies.id, NULL |
-| department_id | uuid | FK -> departments.id, NULL |
-| group_id | uuid | FK -> groups.id, NULL |
-| employee_id | uuid | FK -> employees.id, NULL |
-| created_at | timestamptz | NOT NULL |
+Organization-management mutations must produce append-only audit evidence containing at least:
 
-Constraint:
-- exactly one target FK must be populated, matching `audience_type`.
+- tenant
+- actor
+- entity type/id
+- action
+- before/after or equivalent change evidence
+- correlation id where applicable
+- timestamp
 
-Assignment expansion to concrete learners must be snapshot/audit friendly so future department/group membership changes do not rewrite historical completion evidence.
+Audit does not replace temporal domain tables. Employment and group-membership history remain first-class domain history.
 
-## 9. Lifecycle Rules
+## 7. FK delete semantics
 
-### Company / Department
-- historical records are never hard-deleted.
-- use explicit `PASSIVE` lifecycle state.
+Default policy:
 
-### Employment
-- organizational changes close the old row and create a new row.
-- historical employment is immutable except for controlled correction flows.
+- Tenant -> Organization: RESTRICT
+- Organization -> Company: RESTRICT
+- Company -> Department: RESTRICT
+- Employee -> Employment: RESTRICT
+- Group -> GroupMembership: RESTRICT
+- Position/Location -> Employment: RESTRICT
+- Department parent relationship: RESTRICT while descendants exist
+- ExternalIdentity -> Employee: RESTRICT
 
-### Group Membership
-- removal sets `valid_until`.
-- historical group membership remains queryable.
+Normal lifecycle uses PASSIVE / CLOSED / RETIRED / TERMINATED rather than physical deletion.
 
-### Employee
-- termination changes lifecycle state; assessment/completion/certificate history remains intact.
+## 8. Query projections
 
-## 10. Main Relationship Map
+Read models may derive:
+
+- organization company counts
+- company current employee counts
+- department descendant/current employee counts
+- current primary employment
+- group active member counts
+- position employee counts
+- location employee counts
+
+These are projections only and never become source-of-truth mutable fields.
+
+## 9. Atomic transaction boundaries
+
+### Employee movement
+One transaction must:
+1. validate tenant/organization/company/department consistency,
+2. close current primary employment,
+3. create new employment,
+4. write/emit audit and domain event evidence.
+
+### Department re-parent
+One transaction must:
+1. validate same company,
+2. validate no cycle,
+3. update parent,
+4. emit audit/domain event evidence.
+
+### Group membership change
+One transaction must:
+1. validate same organization,
+2. create or close membership,
+3. preserve historical membership,
+4. emit audit/domain event evidence.
+
+### Dynamic rule activation
+One transaction must:
+1. retire previous active version,
+2. activate new version,
+3. schedule/trigger controlled membership reconciliation.
+
+## 10. Canonical ER overview
 
 ```text
-tenants
-  |
-  +-- organizations
-        |
-        +-- companies
-        |     |
-        |     +-- departments --(parent_department_id)--> departments
-        |     |
-        |     +-- employments -----------------------------+
-        |                                                   |
-        +-- employees <-------------------------------------+
-        |       |
-        |       +-- employee_external_identities
-        |
-        +-- positions
-        |
-        +-- locations
-        |
-        +-- groups
-              |
-              +-- group_memberships --> employees
-              |
-              +-- dynamic_group_rules
-
-users -- user_role_assignments --> organization/company/department scopes
+Tenant
+ └─ Organization
+     ├─ Company
+     │   ├─ Department ──┐
+     │   │      ▲        │ recursive parent
+     │   │      └────────┘
+     │   └─ Employment ───────── Employee
+     │          ├─ Position
+     │          └─ Location
+     ├─ Position
+     ├─ Location
+     ├─ Group
+     │   ├─ GroupMembership ──── Employee
+     │   └─ DynamicGroupRule
+     └─ EmployeeExternalIdentity ─ Employee
 ```
 
-## 11. V1 Minimum Required Tables
+## 11. Non-negotiable invariants
 
-Required for V1 implementation:
+1. No cross-tenant relationship.
+2. Department parent remains in the same company.
+3. Employment department belongs to employment company.
+4. Historical employment is not overwritten to represent movement.
+5. Group membership removal closes validity instead of deleting history.
+6. Employee and User lifecycles remain separate.
+7. UI counters are derived projections.
+8. Dynamic group rules are declarative and versioned.
+9. Training target references are typed and tenant-scoped.
+10. Referential history is preserved for training/reporting/audit evidence.
+
+## 12. V1 minimum implementation set
+
+Required:
 - organizations
 - companies
 - departments
@@ -432,44 +504,15 @@ Required for V1 implementation:
 - positions
 - groups
 - group_memberships
-- user_role_assignments
-- audit events integration
+- scoped role assignments
+- audit integration
 
-Prepared now, UI/automation may follow later:
+Prepared now and may be surfaced incrementally:
 - locations
 - employee_external_identities
 - dynamic_group_rules
-- sync_jobs
+- sync jobs
 
-## 12. Required Indexes
+## 13. Next canonical step
 
-At minimum:
-- `companies (organization_id, status)`
-- `departments (company_id, parent_department_id, status)`
-- `employees (organization_id, status)`
-- `employments (employee_id, start_date desc)`
-- `employments (company_id, department_id, status)`
-- partial index for active primary employment
-- `groups (organization_id, status)`
-- `group_memberships (group_id, valid_until)`
-- `group_memberships (employee_id, valid_until)`
-- `employee_external_identities (tenant_id, provider, external_id)` unique
-- scoped-role indexes based on organization/company/department administration queries.
-
-## 13. Product Consequence
-
-Organization Management becomes a prerequisite for corporate training administration.
-
-Recommended first-run flow:
-
-```text
-Organization
-  -> First company
-  -> Department tree
-  -> Positions
-  -> Employees
-  -> Manual groups (optional)
-  -> Training assignment ready
-```
-
-All organization-management UI and later training-targeting UI must use this contract as the source of truth.
+After acceptance of this data model, the next document is **Organization Management Business Rules V1**, which will formalize lifecycle transitions, validation behavior, dynamic-group semantics, authorization rules, and training-target expansion behavior.
