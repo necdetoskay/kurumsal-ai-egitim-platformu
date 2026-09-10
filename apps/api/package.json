@@ -17,6 +17,7 @@
     "@kaep/db": "workspace:*",
     "@kaep/ingestion": "workspace:*",
     "@kaep/learning": "workspace:*",
+    "@kaep/organization-management-api": "workspace:*",
     "fastify": "^5.0.0",
     "ioredis": "^5.0.0"
   },

@@ -12,6 +12,36 @@ export interface TrainingAssignment {
   completedAt?: Date;
 }
 
+export const assignmentOriginTypes = ['DIRECT', 'AUDIENCE_RESOLUTION'] as const;
+export type AssignmentOriginType = (typeof assignmentOriginTypes)[number];
+
+/**
+ * Learning-owned immutable provenance explaining why an assignment is part of
+ * the learner's history. One assignment may have multiple origin links: for
+ * example an already-active direct assignment can later also be reached by a
+ * confirmed group audience without creating a duplicate TrainingAssignment.
+ */
+export interface TrainingAssignmentOrigin {
+  id: string;
+  tenantId: string;
+  assignmentId: string;
+  originType: AssignmentOriginType;
+  originKey: string;
+  sourceRefId?: string;
+  sourceFingerprint?: string;
+  createdAt: Date;
+}
+
+export interface CreateAssignmentOriginInput {
+  id: string;
+  tenantId: string;
+  assignmentId: string;
+  originType: AssignmentOriginType;
+  sourceRefId?: string;
+  sourceFingerprint?: string;
+  createdAt: Date;
+}
+
 export type LearningEvidenceType = 'MODULE_COMPLETED' | 'ASSESSMENT_RESULT' | 'TRAINING_COMPLETED';
 
 export interface LearningEvidence {
@@ -79,6 +109,56 @@ export function resolveAssignment(
     item.status === 'ACTIVE',
   );
   return duplicate ?? candidate;
+}
+
+export function assignmentOriginKey(input: {
+  originType: AssignmentOriginType;
+  sourceRefId?: string;
+}): string {
+  if (input.originType === 'DIRECT') {
+    if (input.sourceRefId !== undefined) throw new LearningDomainError('VALIDATION_FAILED');
+    return 'DIRECT';
+  }
+  if (!input.sourceRefId?.trim()) throw new LearningDomainError('VALIDATION_FAILED');
+  return `AUDIENCE_RESOLUTION:${input.sourceRefId}`;
+}
+
+export function createAssignmentOrigin(input: CreateAssignmentOriginInput): TrainingAssignmentOrigin {
+  if (!input.id.trim() || !input.tenantId.trim() || !input.assignmentId.trim()) {
+    throw new LearningDomainError('VALIDATION_FAILED');
+  }
+  if (input.originType === 'DIRECT') {
+    if (input.sourceRefId !== undefined || input.sourceFingerprint !== undefined) {
+      throw new LearningDomainError('VALIDATION_FAILED');
+    }
+  } else if (!input.sourceRefId?.trim() || !input.sourceFingerprint?.trim()) {
+    throw new LearningDomainError('VALIDATION_FAILED');
+  }
+
+  return Object.freeze({
+    ...input,
+    originKey: assignmentOriginKey(input),
+  });
+}
+
+export function resolveAssignmentOrigin(
+  existing: readonly TrainingAssignmentOrigin[],
+  candidate: TrainingAssignmentOrigin,
+): TrainingAssignmentOrigin {
+  const prior = existing.find((item) =>
+    item.tenantId === candidate.tenantId &&
+    item.assignmentId === candidate.assignmentId &&
+    item.originKey === candidate.originKey,
+  );
+  if (!prior) return candidate;
+  if (
+    prior.originType !== candidate.originType ||
+    prior.sourceRefId !== candidate.sourceRefId ||
+    prior.sourceFingerprint !== candidate.sourceFingerprint
+  ) {
+    throw new LearningDomainError('CONFLICT');
+  }
+  return prior;
 }
 
 export function transitionAssignment(

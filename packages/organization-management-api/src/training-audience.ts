@@ -13,7 +13,25 @@ export interface TrainingAudiencePreviewData {
   unlinkedEmployeeIds: string[];
 }
 export interface TrainingAudienceConfirmRequest extends TrainingAudiencePreviewRequest { resolutionFingerprint: string; idempotencyKey: string; }
-export interface TrainingAudienceHandoffData { resolutionId: string; resolutionFingerprint: string; assignmentCandidateLearnerIds: string[]; unlinkedEmployeeIds: string[]; }
+
+/**
+ * Immutable handoff returned after a confirmed audience resolution.
+ *
+ * The handoff deliberately carries its trusted scope identity so the consuming
+ * application boundary can prove that a resolution belongs to the exact
+ * tenant/training/version it is about to assign. Learning must never rebuild
+ * historical audience membership from live Organization state.
+ */
+export interface TrainingAudienceHandoffData {
+  tenantId: string;
+  organizationId: string;
+  trainingId: string;
+  trainingVersionId: string;
+  resolutionId: string;
+  resolutionFingerprint: string;
+  assignmentCandidateLearnerIds: string[];
+  unlinkedEmployeeIds: string[];
+}
 
 export const trainingAudienceRoutes: readonly RouteContract[] = [
   { method: 'POST', path: '/api/v1/training-audiences/preview', mutation: false },
