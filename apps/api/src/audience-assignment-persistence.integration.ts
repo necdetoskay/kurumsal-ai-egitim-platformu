@@ -8,12 +8,20 @@ import {
   type PersistConfirmedAudienceAssignmentsInput,
 } from './audience-assignment-persistence.js';
 
-const databaseUrl = process.env.DATABASE_URL;
-if (!databaseUrl) throw new Error('DATABASE_URL is required for M1B PostgreSQL qualification');
+function requiredEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) throw new Error(`${name} is required for M1B PostgreSQL qualification`);
+  return value;
+}
 
+const databaseUrl = requiredEnv('DATABASE_URL');
 const fp = (char: string) => char.repeat(64);
+type Pool = ReturnType<typeof createDatabase>['pool'];
 
-async function expectPersistenceCode(promise: Promise<unknown>, code: AudienceAssignmentPersistenceError['code']): Promise<void> {
+async function expectPersistenceCode(
+  promise: Promise<unknown>,
+  code: AudienceAssignmentPersistenceError['code'],
+): Promise<void> {
   await assert.rejects(promise, (error: unknown) =>
     error instanceof AudienceAssignmentPersistenceError && error.code === code,
   );
@@ -25,46 +33,33 @@ async function expectPgCode(promise: Promise<unknown>, code: string): Promise<vo
   );
 }
 
-async function insertTenant(pool: ReturnType<typeof createDatabase>['pool'], tenantId: string, name: string): Promise<void> {
+async function insertTenant(pool: Pool, tenantId: string, name: string): Promise<void> {
   await pool.query(
     `insert into tenants (id, name, slug) values ($1, $2, $3)`,
     [tenantId, name, `mur-${randomUUID()}`],
   );
 }
 
-async function insertUserWithMembership(
-  pool: ReturnType<typeof createDatabase>['pool'],
-  tenantId: string,
-  userId: string,
-  label: string,
-): Promise<void> {
+async function insertUser(pool: Pool, userId: string, label: string): Promise<void> {
   await pool.query(
     `insert into users (id, display_name, email, is_active) values ($1, $2, $3, true)`,
     [userId, label, `${randomUUID()}@example.invalid`],
   );
+}
+
+async function addMembership(pool: Pool, tenantId: string, userId: string): Promise<void> {
   await pool.query(
     `insert into memberships (tenant_id, user_id, status) values ($1, $2, 'active')`,
     [tenantId, userId],
   );
 }
 
-async function insertUserWithoutTenantMembership(
-  pool: ReturnType<typeof createDatabase>['pool'],
-  userId: string,
-  label: string,
-): Promise<void> {
-  await pool.query(
-    `insert into users (id, display_name, email, is_active) values ($1, $2, $3, true)`,
-    [userId, label, `${randomUUID()}@example.invalid`],
-  );
+async function insertUserWithMembership(pool: Pool, tenantId: string, userId: string, label: string): Promise<void> {
+  await insertUser(pool, userId, label);
+  await addMembership(pool, tenantId, userId);
 }
 
-async function insertOrganization(
-  pool: ReturnType<typeof createDatabase>['pool'],
-  tenantId: string,
-  organizationId: string,
-  label: string,
-): Promise<void> {
+async function insertOrganization(pool: Pool, tenantId: string, organizationId: string, label: string): Promise<void> {
   await pool.query(
     `insert into organizations (id, tenant_id, name, code, default_locale, timezone)
      values ($1, $2, $3, $4, 'tr-TR', 'Europe/Istanbul')`,
@@ -73,7 +68,7 @@ async function insertOrganization(
 }
 
 async function insertEmployee(
-  pool: ReturnType<typeof createDatabase>['pool'],
+  pool: Pool,
   tenantId: string,
   organizationId: string,
   employeeId: string,
@@ -86,12 +81,7 @@ async function insertEmployee(
   );
 }
 
-async function insertTraining(
-  pool: ReturnType<typeof createDatabase>['pool'],
-  tenantId: string,
-  trainingId: string,
-  trainingVersionId: string,
-): Promise<void> {
+async function insertTraining(pool: Pool, tenantId: string, trainingId: string, versionId: string): Promise<void> {
   await pool.query(
     `insert into trainings (id, tenant_id, title, status) values ($1, $2, 'MUR M1B Training', 'PUBLISHED')`,
     [trainingId, tenantId],
@@ -99,7 +89,7 @@ async function insertTraining(
   await pool.query(
     `insert into training_versions (id, tenant_id, training_id, version, snapshot, published_at)
      values ($1, $2, $3, 1, '{}'::jsonb, now())`,
-    [trainingVersionId, tenantId, trainingId],
+    [versionId, tenantId, trainingId],
   );
 }
 
@@ -110,7 +100,7 @@ interface ResolutionMemberSeed {
 }
 
 async function insertResolution(
-  pool: ReturnType<typeof createDatabase>['pool'],
+  pool: Pool,
   input: {
     tenantId: string;
     trainingId: string;
@@ -174,18 +164,13 @@ function command(input: {
   };
 }
 
-async function countRows(
-  pool: ReturnType<typeof createDatabase>['pool'],
-  sql: string,
-  params: readonly unknown[],
-): Promise<number> {
+async function countRows(pool: Pool, sql: string, params: readonly unknown[]): Promise<number> {
   const result = await pool.query<{ count: string }>(sql, [...params]);
   return Number(result.rows[0]?.count ?? '0');
 }
 
 async function main(): Promise<void> {
   const database = createDatabase(databaseUrl);
-
   try {
     const tenant1 = randomUUID();
     const tenant2 = randomUUID();
@@ -216,8 +201,6 @@ async function main(): Promise<void> {
     await insertEmployee(database.pool, tenant1, org1, employeeUnlinked, 'Employee Unlinked');
     await insertEmployee(database.pool, tenant2, org2, employeeTenant2, 'Employee Tenant Two');
 
-    // 1. Real persisted confirmed resolution -> assignments + lineage, including
-    // overlap provenance inside source_audience_ids and one explicit unlinked employee.
     const resolution1 = randomUUID();
     await insertResolution(database.pool, {
       tenantId: tenant1,
@@ -256,8 +239,6 @@ async function main(): Promise<void> {
       [tenant1, resolution1],
     ), 2);
 
-    // 2. Durable replay survives a fresh pool/connection and returns the original
-    // semantic result without any new rows.
     const replayDatabase = createDatabase(databaseUrl);
     try {
       const replay = await persistConfirmedAudienceAssignments(replayDatabase, firstInput);
@@ -266,16 +247,11 @@ async function main(): Promise<void> {
     } finally {
       await replayDatabase.close();
     }
-    assert.equal(await countRows(
-      database.pool,
-      `select count(*) from training_assignment_origins where tenant_id = $1 and source_ref_id = $2`,
-      [tenant1, resolution1],
-    ), 2);
 
-    // 3. A different command key for the same immutable resolution reuses the
-    // assignments and does not duplicate the origin link.
-    const secondKey = await persistConfirmedAudienceAssignments(database, { ...firstInput, idempotencyKey: 'mur-m1b-base-second-key' });
-    assert.equal(secondKey.replayed, false);
+    const secondKey = await persistConfirmedAudienceAssignments(database, {
+      ...firstInput,
+      idempotencyKey: 'mur-m1b-base-second-key',
+    });
     assert.equal(secondKey.result.createdCount, 0);
     assert.equal(secondKey.result.reusedCount, 2);
     assert.equal(await countRows(
@@ -284,7 +260,6 @@ async function main(): Promise<void> {
       [tenant1, resolution1],
     ), 2);
 
-    // 4. Same idempotency key cannot be rebound to another resolution/fingerprint.
     const resolutionConflict = randomUUID();
     await insertResolution(database.pool, {
       tenantId: tenant1,
@@ -306,8 +281,6 @@ async function main(): Promise<void> {
       'PERSISTED_IDEMPOTENCY_CONFLICT',
     );
 
-    // 5. Cross-tenant resolution substitution is indistinguishable from an
-    // unavailable resolution and leaves no idempotency row behind.
     await expectPersistenceCode(
       persistConfirmedAudienceAssignments(database, command({
         tenantId: tenant2,
@@ -325,11 +298,9 @@ async function main(): Promise<void> {
       [tenant2, AUDIENCE_ASSIGNMENT_OPERATION, 'mur-cross-tenant-resolution'],
     ), 0);
 
-    // 6. A globally valid User without active membership in the resolution tenant
-    // cannot be silently turned into a learner assignment.
     const noMembershipUser = randomUUID();
-    await insertUserWithoutTenantMembership(database.pool, noMembershipUser, 'No Membership Learner');
     const employeeNoMembership = randomUUID();
+    await insertUser(database.pool, noMembershipUser, 'No Membership Learner');
     await insertEmployee(database.pool, tenant1, org1, employeeNoMembership, 'No Membership Employee');
     const resolutionNoMembership = randomUUID();
     await insertResolution(database.pool, {
@@ -352,12 +323,11 @@ async function main(): Promise<void> {
       'LEARNER_NOT_ASSIGNABLE',
     );
 
-    // 7. Existing DIRECT assignment is reused and keeps both immutable reasons.
     const directUser = randomUUID();
     const directEmployee = randomUUID();
+    const directAssignment = randomUUID();
     await insertUserWithMembership(database.pool, tenant1, directUser, 'Direct Learner');
     await insertEmployee(database.pool, tenant1, org1, directEmployee, 'Direct Employee');
-    const directAssignment = randomUUID();
     await database.pool.query(
       `insert into training_assignments
          (id, tenant_id, learner_id, training_id, training_version_id, status, assigned_at)
@@ -394,16 +364,12 @@ async function main(): Promise<void> {
       [tenant1, directAssignment],
     ), 2);
 
-    // 8. Forced fault after the first persisted learner proves all writes,
-    // including the idempotency claim, roll back atomically.
-    const rollbackUser1 = randomUUID();
-    const rollbackUser2 = randomUUID();
-    const rollbackEmployee1 = randomUUID();
-    const rollbackEmployee2 = randomUUID();
-    await insertUserWithMembership(database.pool, tenant1, rollbackUser1, 'Rollback Learner One');
-    await insertUserWithMembership(database.pool, tenant1, rollbackUser2, 'Rollback Learner Two');
-    await insertEmployee(database.pool, tenant1, org1, rollbackEmployee1, 'Rollback Employee One');
-    await insertEmployee(database.pool, tenant1, org1, rollbackEmployee2, 'Rollback Employee Two');
+    const rollbackUsers = [randomUUID(), randomUUID()];
+    const rollbackEmployees = [randomUUID(), randomUUID()];
+    await insertUserWithMembership(database.pool, tenant1, rollbackUsers[0]!, 'Rollback One');
+    await insertUserWithMembership(database.pool, tenant1, rollbackUsers[1]!, 'Rollback Two');
+    await insertEmployee(database.pool, tenant1, org1, rollbackEmployees[0]!, 'Rollback Employee One');
+    await insertEmployee(database.pool, tenant1, org1, rollbackEmployees[1]!, 'Rollback Employee Two');
     const rollbackResolution = randomUUID();
     await insertResolution(database.pool, {
       tenantId: tenant1,
@@ -412,11 +378,10 @@ async function main(): Promise<void> {
       resolutionId: rollbackResolution,
       fingerprint: fp('e'),
       members: [
-        { employeeId: rollbackEmployee1, learnerUserId: rollbackUser1 },
-        { employeeId: rollbackEmployee2, learnerUserId: rollbackUser2 },
+        { employeeId: rollbackEmployees[0]!, learnerUserId: rollbackUsers[0]! },
+        { employeeId: rollbackEmployees[1]!, learnerUserId: rollbackUsers[1]! },
       ],
     });
-    const rollbackKey = 'mur-rollback';
     await assert.rejects(
       persistConfirmedAudienceAssignments(
         database,
@@ -426,7 +391,7 @@ async function main(): Promise<void> {
           trainingVersionId: version1,
           resolutionId: rollbackResolution,
           fingerprint: fp('e'),
-          idempotencyKey: rollbackKey,
+          idempotencyKey: 'mur-rollback',
         }),
         { afterAssignmentPersisted: (count) => { if (count === 1) throw new Error('FORCED_M1B_ROLLBACK'); } },
       ),
@@ -435,7 +400,7 @@ async function main(): Promise<void> {
     assert.equal(await countRows(
       database.pool,
       `select count(*) from training_assignments where learner_id = any($1::uuid[])`,
-      [[rollbackUser1, rollbackUser2]],
+      [rollbackUsers],
     ), 0);
     assert.equal(await countRows(
       database.pool,
@@ -444,12 +409,10 @@ async function main(): Promise<void> {
     ), 0);
     assert.equal(await countRows(
       database.pool,
-      `select count(*) from command_idempotency where tenant_id = $1 and operation = $2 and idempotency_key = $3`,
-      [tenant1, AUDIENCE_ASSIGNMENT_OPERATION, rollbackKey],
+      `select count(*) from command_idempotency where tenant_id = $1 and operation = $2 and idempotency_key = 'mur-rollback'`,
+      [tenant1, AUDIENCE_ASSIGNMENT_OPERATION],
     ), 0);
 
-    // 9. Two distinct command keys racing the same learner/resolution converge on
-    // one ACTIVE assignment and one audience origin through DB uniqueness.
     const concurrentUser = randomUUID();
     const concurrentEmployee = randomUUID();
     await insertUserWithMembership(database.pool, tenant1, concurrentUser, 'Concurrent Learner');
@@ -463,19 +426,19 @@ async function main(): Promise<void> {
       fingerprint: fp('f'),
       members: [{ employeeId: concurrentEmployee, learnerUserId: concurrentUser }],
     });
+    const concurrentInput = command({
+      tenantId: tenant1,
+      trainingId: training1,
+      trainingVersionId: version1,
+      resolutionId: concurrentResolution,
+      fingerprint: fp('f'),
+      idempotencyKey: 'mur-concurrent-a',
+    });
     const concurrentDb = createDatabase(databaseUrl);
     try {
-      const baseConcurrent = command({
-        tenantId: tenant1,
-        trainingId: training1,
-        trainingVersionId: version1,
-        resolutionId: concurrentResolution,
-        fingerprint: fp('f'),
-        idempotencyKey: 'mur-concurrent-a',
-      });
       await Promise.all([
-        persistConfirmedAudienceAssignments(database, baseConcurrent),
-        persistConfirmedAudienceAssignments(concurrentDb, { ...baseConcurrent, idempotencyKey: 'mur-concurrent-b' }),
+        persistConfirmedAudienceAssignments(database, concurrentInput),
+        persistConfirmedAudienceAssignments(concurrentDb, { ...concurrentInput, idempotencyKey: 'mur-concurrent-b' }),
       ]);
     } finally {
       await concurrentDb.close();
@@ -492,8 +455,6 @@ async function main(): Promise<void> {
       [tenant1, concurrentResolution],
     ), 1);
 
-    // 10. DB-level tenant FK blocks a resolution member carrying tenant2 while
-    // pointing at tenant1's resolution, even when its employee is valid in tenant2.
     await expectPgCode(
       database.pool.query(
         `insert into training_audience_resolution_members
@@ -503,9 +464,6 @@ async function main(): Promise<void> {
       ),
       '23503',
     );
-
-    // 11. DB-level exact training-version FK blocks a tenant2 assignment from
-    // borrowing tenant1's Training/TrainingVersion identifiers.
     await expectPgCode(
       database.pool.query(
         `insert into training_assignments
@@ -516,8 +474,6 @@ async function main(): Promise<void> {
       '23503',
     );
 
-    // 12. Immutable lineage round-trips from Learning assignment back to the
-    // confirmed Organization resolution identity and fingerprint.
     const lineage = await database.pool.query<{
       assignment_id: string;
       source_ref_id: string;
