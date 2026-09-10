@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { check, index, jsonb, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { check, foreignKey, index, jsonb, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 import { tenants, users } from './schema.js';
 import { trainingVersions, trainings } from './training-schema.js';
 
@@ -14,6 +14,7 @@ export const trainingAssignments = pgTable('training_assignments', {
   completedAt: timestamp('completed_at', { withTimezone: true }),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => ({
+  tenantIdentityUnique: uniqueIndex('training_assignments_tenant_id_uq').on(table.tenantId, table.id),
   tenantLearnerIdx: index('training_assignments_tenant_learner_idx').on(table.tenantId, table.learnerId),
   identityStatusIdx: index('training_assignments_identity_status_idx').on(table.tenantId, table.learnerId, table.trainingVersionId, table.status),
   activeIdentityUnique: uniqueIndex('training_assignments_active_identity_uq')
@@ -31,13 +32,18 @@ export const trainingAssignmentOriginType = pgEnum('training_assignment_origin_t
 export const trainingAssignmentOrigins = pgTable('training_assignment_origins', {
   id: uuid('id').defaultRandom().primaryKey(),
   tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'restrict' }),
-  assignmentId: uuid('assignment_id').notNull().references(() => trainingAssignments.id, { onDelete: 'restrict' }),
+  assignmentId: uuid('assignment_id').notNull(),
   originType: trainingAssignmentOriginType('origin_type').notNull(),
   originKey: text('origin_key').notNull(),
   sourceRefId: text('source_ref_id'),
   sourceFingerprint: text('source_fingerprint'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => ({
+  assignmentFk: foreignKey({
+    name: 'training_assignment_origins_tenant_assignment_fk',
+    columns: [table.tenantId, table.assignmentId],
+    foreignColumns: [trainingAssignments.tenantId, trainingAssignments.id],
+  }).onDelete('restrict'),
   assignmentOriginUnique: uniqueIndex('training_assignment_origins_assignment_origin_uq').on(table.tenantId, table.assignmentId, table.originKey),
   sourceLookupIdx: index('training_assignment_origins_source_idx').on(table.tenantId, table.originType, table.sourceRefId),
   shape: check('training_assignment_origins_shape_ck', sql`(
