@@ -34,11 +34,11 @@ async function main(){
     await db.pool.query('insert into assessment_question_snapshots(tenant_id,assessment_id,question_id,question_version_id,objective_id,position,prompt,options_json,correct_option_index,points) values($1,$2,$3,$4,$5,$6,$7,$8::jsonb,1,1)',[tenant,assessment,qid,qv,objective,i+1,`Q${i+1}`,JSON.stringify(['No','Yes'])]);
     await db.pool.query('insert into objective_evidence(tenant_id,assignment_id,learner_id,training_id,training_version_id,objective_id,assessment_id,attempt_id,question_version_id,earned_points,possible_points,correct) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,1,$11)',[tenant,assignmentA,learnerA,training,version,objective,assessment,attemptA,qv,i===0?1:0,i===0]);
   }
-  await db.pool.query('insert into objective_evidence(tenant_id,assignment_id,learner_id,training_id,training_version_id,objective_id,assessment_id,attempt_id,question_version_id,earned_points,possible_points,correct) values($1,$2,$3,$4,$5,$6,$7,$8,$9,0,1,false)',[tenant,assignmentB,learnerB,training,version,objective,assessment,attemptB,versions[0]]);
+  await db.pool.query('insert into objective_evidence(tenant_id,assignment_id,learner_id,training_id,training_version_id,objective_id,assessment_id,attempt_id,question_version_id,earned_points,possible_points,correct) values($1,$2,$3,$4,$5,$6,$7,$8,$9,0,1,false)',[tenant,assignmentB,learnerB,training,version,objective,assessment,attemptB,versions[0]!]);
 
   const runtime=createInsightRuntime(db);
   const a=await runtime.getInsights({tenantId:tenant,userId:learnerA},version);
-  assert.equal(a.status,'BOUNDED_INSIGHT');assert.equal(a.insights.length,1);assert.equal(a.insights[0].sampleCount,3);assert.equal(a.insights[0].weak,true);assert.equal(a.recommendations.length,1);assert.equal(a.recommendations[0].contentId,contentId);
+  assert.equal(a.status,'BOUNDED_INSIGHT');assert.equal(a.insights.length,1);assert.equal(a.insights[0]!.sampleCount,3);assert.equal(a.insights[0]!.weak,true);assert.equal(a.recommendations.length,1);assert.equal(a.recommendations[0]!.contentId,contentId);
   const b=await runtime.getInsights({tenantId:tenant,userId:learnerB},version);
   assert.equal(b.status,'INSUFFICIENT_EVIDENCE');assert.equal(b.insights.length,0);assert.equal(b.recommendations.length,0);
   await rejectCode(runtime.getInsights({tenantId:tenant,userId:unassigned},version),'TRAINING_NOT_AVAILABLE');
