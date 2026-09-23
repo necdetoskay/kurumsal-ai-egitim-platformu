@@ -8,6 +8,7 @@ import { createOrganizationRuntime } from './organization-runtime.js';
 import { createLearnerRuntime, LearnerRuntimeError, type ProgressKind } from './learner-runtime.js';
 import { createAssessmentRuntime, AssessmentRuntimeError } from './assessment-runtime.js';
 import { createInsightRuntime, InsightRuntimeError } from './insight-runtime.js';
+import { createOrganizationAnalyticsRuntime, OrganizationAnalyticsError, type AnalyticsScopeType } from './organization-analytics-runtime.js';
 
 export function buildApp(config: AppConfig) {
   const app = Fastify({
@@ -20,6 +21,7 @@ export function buildApp(config: AppConfig) {
   const learnerRuntime = createLearnerRuntime(database);
   const assessmentRuntime = createAssessmentRuntime(database);
   const insightRuntime = createInsightRuntime(database);
+  const organizationAnalyticsRuntime = createOrganizationAnalyticsRuntime(database);
   const redis = new Redis(config.REDIS_URL, {
     lazyConnect: true,
     maxRetriesPerRequest: 1,
@@ -203,6 +205,18 @@ export function buildApp(config: AppConfig) {
   app.get('/api/v1/organizations/:organizationId/groups', async (request,reply)=>{ const p=await adminPrincipal(request,reply); if(!p)return; const {organizationId}=request.params as any; return {items:await organizationRuntime.listGroups(p,organizationId)}; });
   app.post('/api/v1/organizations/:organizationId/groups', async (request,reply)=>{ const p=await adminPrincipal(request,reply); if(!p)return; const {organizationId}=request.params as any; const v=await organizationRuntime.createGroup(p,organizationId,request.body??{}); return v?reply.code(201).send(v):reply.code(404).send({code:'ORGANIZATION_NOT_FOUND'}); });
   app.post('/api/v1/groups/:groupId/members', async (request,reply)=>{ const p=await adminPrincipal(request,reply); if(!p)return; const {groupId}=request.params as any; const v=await organizationRuntime.addGroupMember(p,groupId,request.body??{}); return v?reply.code(201).send(v):reply.code(404).send({code:'GROUP_OR_EMPLOYEE_NOT_FOUND'}); });
+
+  app.get('/api/v1/admin/learning-analytics', async (request,reply)=>{
+    const p=await adminPrincipal(request,reply); if(!p)return;
+    const q=(request.query??{}) as Record<string,unknown>;
+    if('tenantId' in q||'learnerId' in q)return reply.code(400).send({code:'CLIENT_IDENTITY_OVERRIDE_FORBIDDEN'});
+    const scopeType=q.scopeType as AnalyticsScopeType|undefined;
+    const scopeId=typeof q.scopeId==='string'?q.scopeId:undefined;
+    const trainingVersionId=typeof q.trainingVersionId==='string'?q.trainingVersionId:undefined;
+    if(!scopeType||!['ORGANIZATION','COMPANY','DEPARTMENT','GROUP'].includes(scopeType)||!scopeId)return reply.code(400).send({code:'INVALID_ANALYTICS_SCOPE'});
+    try { return await organizationAnalyticsRuntime.getAggregate(p,{scopeType,scopeId,trainingVersionId}); }
+    catch(error){ if(error instanceof OrganizationAnalyticsError)return reply.code(404).send({code:error.code}); throw error; }
+  });
 
   app.get('/readyz', async (_request, reply) => {
     const checks = {
