@@ -5,7 +5,7 @@ describe('loadConfig', () => {
   it('parses required runtime configuration', () => {
     const config = loadConfig({
       DATABASE_URL: 'postgresql://user:pass@localhost:5432/app',
-      REDIS_URL: 'redis://localhost:6379',
+      REDIS_URL: 'redis://localhost:6379', AUTH_JWKS_URL: 'https://auth.invalid/.well-known/jwks.json', AUTH_ISSUER: 'https://auth.invalid/', AUTH_AUDIENCE: 'kaep-api',
     });
 
     expect(config.API_PORT).toBe(3000);

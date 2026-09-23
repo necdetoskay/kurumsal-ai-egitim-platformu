@@ -9,6 +9,9 @@ const config: AppConfig = {
   LOG_LEVEL: 'silent',
   DATABASE_URL: 'postgresql://kaep:kaep@localhost:5432/kaep',
   REDIS_URL: 'redis://localhost:6379',
+  AUTH_JWKS_URL: 'https://auth.invalid/.well-known/jwks.json',
+  AUTH_ISSUER: 'https://auth.invalid/',
+  AUTH_AUDIENCE: 'kaep-api',
 };
 
 const apps: ReturnType<typeof buildApp>[] = [];

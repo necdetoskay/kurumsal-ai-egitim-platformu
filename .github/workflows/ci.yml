@@ -37,6 +37,9 @@ jobs:
       DATABASE_URL: postgresql://kaep:kaep@localhost:5432/kaep
       REDIS_URL: redis://localhost:6379
       LOG_LEVEL: silent
+      AUTH_JWKS_URL: https://auth.invalid/.well-known/jwks.json
+      AUTH_ISSUER: https://auth.invalid/
+      AUTH_AUDIENCE: kaep-api
 
     steps:
       - uses: actions/checkout@v4
