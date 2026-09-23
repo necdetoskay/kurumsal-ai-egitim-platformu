@@ -20,6 +20,6 @@ describe('verified bearer authentication',()=>{
     const auth=createAuthenticator(config,{pool:{query}} as any);
     const p=await auth('Bearer signed-token');
     expect(p).toEqual({userId:'user-a',tenantId:'tenant-a',roleCodes:['tenant_admin'],permissions:['organization.manage']});
-    expect(query.mock.calls[0][1]).toEqual(['subject-a','tenant-a']);
+    expect(query.mock.calls[0]?.[1]).toEqual(['subject-a','tenant-a']);
   });
 });
