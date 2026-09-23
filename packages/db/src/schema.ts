@@ -1,4 +1,4 @@
-import { boolean, index, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { boolean, index, pgTable, primaryKey, text, timestamp, unique, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 
 export const systemMetadata = pgTable('system_metadata', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -41,6 +41,7 @@ export const memberships = pgTable('memberships', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => ({
   tenantUserUnique: uniqueIndex('memberships_tenant_user_uq').on(table.tenantId, table.userId),
+  tenantUserFkTarget: unique('memberships_tenant_user_fk_uq').on(table.tenantId, table.userId),
   tenantStatusIdx: index('memberships_tenant_status_idx').on(table.tenantId, table.status),
 }));
 

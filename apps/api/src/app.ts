@@ -9,6 +9,7 @@ import { createLearnerRuntime, LearnerRuntimeError, type ProgressKind } from './
 import { createAssessmentRuntime, AssessmentRuntimeError } from './assessment-runtime.js';
 import { createInsightRuntime, InsightRuntimeError } from './insight-runtime.js';
 import { createOrganizationAnalyticsRuntime, OrganizationAnalyticsError, type AnalyticsScopeType } from './organization-analytics-runtime.js';
+import { createAudienceRuntime, AudienceRuntimeError, TrainingAudienceInvariantError } from './audience-runtime.js';
 
 export function buildApp(config: AppConfig) {
   const app = Fastify({
@@ -22,6 +23,7 @@ export function buildApp(config: AppConfig) {
   const assessmentRuntime = createAssessmentRuntime(database);
   const insightRuntime = createInsightRuntime(database);
   const organizationAnalyticsRuntime = createOrganizationAnalyticsRuntime(database);
+  const audienceRuntime = createAudienceRuntime(database);
   const redis = new Redis(config.REDIS_URL, {
     lazyConnect: true,
     maxRetriesPerRequest: 1,
@@ -205,6 +207,54 @@ export function buildApp(config: AppConfig) {
   app.get('/api/v1/organizations/:organizationId/groups', async (request,reply)=>{ const p=await adminPrincipal(request,reply); if(!p)return; const {organizationId}=request.params as any; return {items:await organizationRuntime.listGroups(p,organizationId)}; });
   app.post('/api/v1/organizations/:organizationId/groups', async (request,reply)=>{ const p=await adminPrincipal(request,reply); if(!p)return; const {organizationId}=request.params as any; const v=await organizationRuntime.createGroup(p,organizationId,request.body??{}); return v?reply.code(201).send(v):reply.code(404).send({code:'ORGANIZATION_NOT_FOUND'}); });
   app.post('/api/v1/groups/:groupId/members', async (request,reply)=>{ const p=await adminPrincipal(request,reply); if(!p)return; const {groupId}=request.params as any; const v=await organizationRuntime.addGroupMember(p,groupId,request.body??{}); return v?reply.code(201).send(v):reply.code(404).send({code:'GROUP_OR_EMPLOYEE_NOT_FOUND'}); });
+
+  async function audiencePrincipal(request:any,reply:any) {
+    try {
+      const principal=await authenticate(request.headers.authorization);
+      if(!principal.roleCodes.some((role:string)=>role==='tenant_admin'||role==='instructor')) { reply.code(403).send({code:'INSUFFICIENT_ROLE'}); return null; }
+      return principal;
+    } catch(error) {
+      reply.code(401).send({code:error instanceof AuthenticationError?error.code:'TOKEN_INVALID'}); return null;
+    }
+  }
+  function audienceError(reply:any,error:unknown){
+    if(error instanceof AudienceRuntimeError){
+      const status=error.code==='TRAINING_VERSION_NOT_AVAILABLE'||error.code==='AUDIENCE_NOT_AVAILABLE'?404:error.code==='RESOLUTION_FINGERPRINT_MISMATCH'||error.code==='IDEMPOTENCY_CONFLICT'?409:400;
+      return reply.code(status).send({code:error.code});
+    }
+    if(error instanceof TrainingAudienceInvariantError){
+      const status=error.code==='AUDIENCE_TARGET_NOT_FOUND'?404:error.code.includes('CROSS_')?403:409;
+      return reply.code(status).send({code:error.code});
+    }
+    throw error;
+  }
+  app.post('/api/v1/training-audiences/preview',async(request,reply)=>{
+    const p=await audiencePrincipal(request,reply);if(!p)return;
+    const b=(request.body??{}) as any;if('tenantId' in b||'learnerId' in b)return reply.code(400).send({code:'CLIENT_IDENTITY_OVERRIDE_FORBIDDEN'});
+    if(!b.organizationId||!b.trainingId||!b.trainingVersionId||!Array.isArray(b.targets)||b.targets.length===0)return reply.code(400).send({code:'INVALID_REQUEST'});
+    try{return await audienceRuntime.preview(p,{organizationId:b.organizationId,trainingId:b.trainingId,trainingVersionId:b.trainingVersionId,targets:b.targets});}
+    catch(error){return audienceError(reply,error);}
+  });
+  app.post('/api/v1/training-audiences/confirm',async(request,reply)=>{
+    const p=await audiencePrincipal(request,reply);if(!p)return;
+    const b=(request.body??{}) as any;if('tenantId' in b||'learnerId' in b)return reply.code(400).send({code:'CLIENT_IDENTITY_OVERRIDE_FORBIDDEN'});
+    if(!b.organizationId||!b.trainingId||!b.trainingVersionId||!Array.isArray(b.targets)||!b.resolutionFingerprint||!b.idempotencyKey)return reply.code(400).send({code:'INVALID_REQUEST'});
+    try{return reply.code(201).send(await audienceRuntime.confirm(p,{organizationId:b.organizationId,trainingId:b.trainingId,trainingVersionId:b.trainingVersionId,targets:b.targets,resolutionFingerprint:b.resolutionFingerprint,idempotencyKey:b.idempotencyKey}));}
+    catch(error){return audienceError(reply,error);}
+  });
+  app.put('/api/v1/employees/:employeeId/user-link',async(request,reply)=>{
+    const p=await adminPrincipal(request,reply);if(!p)return;
+    const {employeeId}=request.params as {employeeId:string};const b=(request.body??{}) as any;
+    if('tenantId' in b)return reply.code(400).send({code:'CLIENT_TENANT_OVERRIDE_FORBIDDEN'});
+    if(!b.userId)return reply.code(400).send({code:'INVALID_REQUEST'});
+    try{const v=await organizationRuntime.linkEmployeeUser(p,employeeId,b.userId);return v?reply.code(200).send(v):reply.code(404).send({code:'EMPLOYEE_OR_MEMBERSHIP_NOT_FOUND'});}
+    catch(error:any){if(error?.message==='EMPLOYEE_ALREADY_LINKED'||error?.message==='USER_ALREADY_LINKED')return reply.code(409).send({code:error.message});throw error;}
+  });
+  app.delete('/api/v1/employees/:employeeId/user-link',async(request,reply)=>{
+    const p=await adminPrincipal(request,reply);if(!p)return;
+    const {employeeId}=request.params as {employeeId:string};const v=await organizationRuntime.unlinkEmployeeUser(p,employeeId);
+    return v?reply.code(200).send(v):reply.code(404).send({code:'EMPLOYEE_LINK_NOT_FOUND'});
+  });
 
   app.get('/api/v1/admin/learning-analytics', async (request,reply)=>{
     const p=await adminPrincipal(request,reply); if(!p)return;
