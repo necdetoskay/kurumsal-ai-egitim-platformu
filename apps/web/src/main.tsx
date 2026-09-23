@@ -3,7 +3,7 @@ import { sessionFromRuntime } from './runtime-session';
 import { createRoot } from 'react-dom/client';
 import { canRenderProtectedShell, sessionMessage, type SessionState, type SessionStatus } from './auth';
 import { InstructorAuthoringWorkspace } from './authoring-ui';
-import { QuestionAssessmentWorkspace } from './assessment-ui';
+import { AssessmentAuthoringRuntimeView } from './assessment-authoring-runtime-view';
 import { OrganizationRuntimeView } from './organization-runtime-view';
 import { PersonnelRuntimeView } from './personnel-runtime-view';
 import { GroupRuntimeView } from './group-runtime-view';
@@ -20,7 +20,7 @@ function StatePanel({ state }: { state: Exclude<ViewState, 'success'> }) { const
 
 function WorkflowScreen({ screen, role }: { screen: ScreenDefinition; role: WebRole }) {
   if (role === 'instructor' && screen.href === '/instructor/trainings') return <InstructorAuthoringWorkspace />;
-  if (role === 'instructor' && (screen.href === '/instructor/questions' || screen.href === '/instructor/assessments')) return <QuestionAssessmentWorkspace />;
+  if (role === 'instructor' && (screen.href === '/instructor/questions' || screen.href === '/instructor/assessments')) return <AssessmentAuthoringRuntimeView />;
   if (role === 'tenant_admin' && screen.href === '/admin/organization') return <OrganizationRuntimeView />;
   if (role === 'tenant_admin' && screen.href === '/admin/organization/personnel') return <PersonnelRuntimeView />;
   if (role === 'tenant_admin' && screen.href === '/admin/organization/directory') return <GroupRuntimeView />;
