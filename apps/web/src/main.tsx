@@ -7,6 +7,7 @@ import { QuestionAssessmentWorkspace } from './assessment-ui';
 import { OrganizationRuntimeView } from './organization-runtime-view';
 import { PersonnelRuntimeView } from './personnel-runtime-view';
 import { GroupRuntimeView } from './group-runtime-view';
+import { AudienceRuntimeView, LearnerTrainingRuntimeView, LearnerAssessmentRuntimeView, LearnerInsightRuntimeView, LearnerCertificateRuntimeView, AdminAnalyticsRuntimeView } from './mission-runtime-ui';
 
 import { navForRole, type WebRole } from './navigation';
 import { defaultScreenFor, screenFor, type ScreenDefinition } from './screens';
@@ -23,7 +24,12 @@ function WorkflowScreen({ screen, role }: { screen: ScreenDefinition; role: WebR
   if (role === 'tenant_admin' && screen.href === '/admin/organization') return <OrganizationRuntimeView />;
   if (role === 'tenant_admin' && screen.href === '/admin/organization/personnel') return <PersonnelRuntimeView />;
   if (role === 'tenant_admin' && screen.href === '/admin/organization/directory') return <GroupRuntimeView />;
-  if (role === 'tenant_admin' && screen.href === '/admin/organization/operations') return <StatePanel state="empty" />;
+  if (role === 'tenant_admin' && (screen.href === '/admin/organization/operations' || screen.href === '/admin/organization/operations/audience')) return <AudienceRuntimeView />;
+  if (role === 'tenant_admin' && screen.href === '/admin/analytics') return <AdminAnalyticsRuntimeView />;
+  if (role === 'learner' && (screen.href === '/learn' || screen.href === '/learn/trainings')) return <LearnerTrainingRuntimeView />;
+  if (role === 'learner' && screen.href === '/learn/assessments') return <LearnerAssessmentRuntimeView />;
+  if (role === 'learner' && screen.href === '/learn/insights') return <LearnerInsightRuntimeView />;
+  if (role === 'learner' && screen.href === '/learn/certificates') return <LearnerCertificateRuntimeView />;
   const learner = role === 'learner';
   return <><header className="page-header"><div><span className="eyebrow">Ekran #{screen.id} · {roleLabels[role]}</span><h1>{screen.title}</h1><p>{screen.description}</p></div><span className="status-badge">{learner ? 'Sunucu yetkili' : 'Rol kapsamı'}</span></header><section className="content-card" aria-labelledby="workflow-state-title"><h2 id="workflow-state-title">Desteklenen durumlar</h2><div className="chip-row">{screen.workflowStates.map((state) => <span className="state-chip" key={state}>{state}</span>)}</div></section>{learner && <section className="content-card safety-card"><h2>Learner güvenlik sınırı</h2><p>Navigation yalnız sunum katmanıdır. Yetkilendirme sunucu tarafında yapılır; assessment answer key ve scoring secret istemci projection’ına dahil edilmez.</p></section>}</>;
 }
