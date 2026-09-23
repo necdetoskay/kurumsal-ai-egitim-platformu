@@ -19,7 +19,8 @@ function StatePanel({ state }: { state: Exclude<ViewState, 'success'> }) { const
 
 function WorkflowScreen({ screen, role }: { screen: ScreenDefinition; role: WebRole }) {
   if (role === 'instructor' && screen.href === '/instructor/trainings') return <InstructorAuthoringWorkspace />;
-  if (role === 'instructor' && (screen.href === '/instructor/questions' || screen.href === '/instructor/assessments')) return <QuestionAssessmentWorkspace />;
+  if (role === 'instructor' && (screen.href === '/instructor/questions' || screen.href === '/instructor/assessments')) return <QuestionAssessmentWorkspace role="instructor" />;
+  if (role === 'reviewer' && screen.href === '/reviewer/queue') return <QuestionAssessmentWorkspace role="reviewer" />;
   if (role === 'tenant_admin' && screen.href === '/admin/organization') return <OrganizationRuntimeView />;
   if (role === 'tenant_admin' && screen.href === '/admin/organization/personnel') return <PersonnelRuntimeView />;
   if (role === 'tenant_admin' && screen.href === '/admin/organization/directory') return <GroupRuntimeView />;
