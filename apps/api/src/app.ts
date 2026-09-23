@@ -11,6 +11,7 @@ import { createInsightRuntime, InsightRuntimeError } from './insight-runtime.js'
 import { createOrganizationAnalyticsRuntime, OrganizationAnalyticsError, type AnalyticsScopeType } from './organization-analytics-runtime.js';
 import { createAudienceRuntime, AudienceRuntimeError, TrainingAudienceInvariantError } from './audience-runtime.js';
 import { createTrainingRuntime, TrainingRuntimeError } from './training-runtime.js';
+import { createAssessmentAuthoringRuntime, AssessmentAuthoringError } from './assessment-authoring-runtime.js';
 
 export function buildApp(config: AppConfig) {
   const app = Fastify({
@@ -26,6 +27,7 @@ export function buildApp(config: AppConfig) {
   const organizationAnalyticsRuntime = createOrganizationAnalyticsRuntime(database);
   const audienceRuntime = createAudienceRuntime(database);
   const trainingRuntime = createTrainingRuntime(database);
+  const assessmentAuthoringRuntime = createAssessmentAuthoringRuntime(database);
   const redis = new Redis(config.REDIS_URL, {
     lazyConnect: true,
     maxRetriesPerRequest: 1,
@@ -123,6 +125,68 @@ export function buildApp(config: AppConfig) {
     const {trainingId}=request.params as {trainingId:string};
     const idempotencyKey=typeof request.headers['idempotency-key']==='string'?request.headers['idempotency-key']:'';
     try{return await trainingRuntime.publish(p,trainingId,idempotencyKey);}catch(error){return trainingError(reply,error);}
+  });
+
+  async function authoringPrincipal(request:any,reply:any,permission:string) {
+    try {
+      const principal=await authenticate(request.headers.authorization);
+      if(!principal.permissions.includes(permission)) { reply.code(403).send({code:'INSUFFICIENT_PERMISSION'}); return null; }
+      return principal;
+    } catch(error) {
+      reply.code(401).send({code:error instanceof AuthenticationError?error.code:'TOKEN_INVALID'}); return null;
+    }
+  }
+  function assessmentAuthoringError(reply:any,error:unknown){
+    if(error instanceof AssessmentAuthoringError){
+      const status=error.code.endsWith('_NOT_FOUND')?404:
+        error.code.includes('TRANSITION')||error.code==='QUESTION_NOT_APPROVED'?409:422;
+      return reply.code(status).send({code:error.code});
+    }
+    throw error;
+  }
+  app.get('/api/v1/questions',async(request,reply)=>{
+    const p=await authoringPrincipal(request,reply,'question.read');if(!p)return;
+    return {items:await assessmentAuthoringRuntime.listQuestions(p)};
+  });
+  app.post('/api/v1/questions',async(request,reply)=>{
+    const p=await authoringPrincipal(request,reply,'question.create');if(!p)return;
+    const b=(request.body??{}) as any;if('tenantId' in b)return reply.code(400).send({code:'CLIENT_TENANT_OVERRIDE_FORBIDDEN'});
+    try{return reply.code(201).send(await assessmentAuthoringRuntime.createQuestion(p,b));}catch(error){return assessmentAuthoringError(reply,error);}
+  });
+  app.get('/api/v1/questions/:questionId',async(request,reply)=>{
+    const p=await authoringPrincipal(request,reply,'question.read');if(!p)return;
+    const {questionId}=request.params as {questionId:string};
+    try{return await assessmentAuthoringRuntime.getQuestion(p,questionId);}catch(error){return assessmentAuthoringError(reply,error);}
+  });
+  app.post('/api/v1/questions/:questionId/submit-review',async(request,reply)=>{
+    const p=await authoringPrincipal(request,reply,'question.edit');if(!p)return;
+    const {questionId}=request.params as {questionId:string};
+    try{return await assessmentAuthoringRuntime.submitQuestionReview(p,questionId);}catch(error){return assessmentAuthoringError(reply,error);}
+  });
+  app.post('/api/v1/questions/:questionId/approve',async(request,reply)=>{
+    const p=await authoringPrincipal(request,reply,'question.review');if(!p)return;
+    const {questionId}=request.params as {questionId:string};
+    try{return await assessmentAuthoringRuntime.approveQuestion(p,questionId);}catch(error){return assessmentAuthoringError(reply,error);}
+  });
+  app.get('/api/v1/assessments',async(request,reply)=>{
+    const p=await authoringPrincipal(request,reply,'assessment.read');if(!p)return;
+    return {items:await assessmentAuthoringRuntime.listAssessments(p)};
+  });
+  app.post('/api/v1/assessments',async(request,reply)=>{
+    const p=await authoringPrincipal(request,reply,'assessment.create');if(!p)return;
+    const b=(request.body??{}) as any;if('tenantId' in b)return reply.code(400).send({code:'CLIENT_TENANT_OVERRIDE_FORBIDDEN'});
+    try{return reply.code(201).send(await assessmentAuthoringRuntime.createAssessment(p,b));}catch(error){return assessmentAuthoringError(reply,error);}
+  });
+  app.get('/api/v1/assessments/:assessmentId',async(request,reply)=>{
+    const p=await authoringPrincipal(request,reply,'assessment.read');if(!p)return;
+    const {assessmentId}=request.params as {assessmentId:string};
+    try{return await assessmentAuthoringRuntime.getAssessment(p,assessmentId);}catch(error){return assessmentAuthoringError(reply,error);}
+  });
+  app.post('/api/v1/assessments/:assessmentId/publish',async(request,reply)=>{
+    const p=await authoringPrincipal(request,reply,'assessment.publish');if(!p)return;
+    const {assessmentId}=request.params as {assessmentId:string};const b=(request.body??{}) as any;
+    if('tenantId' in b)return reply.code(400).send({code:'CLIENT_TENANT_OVERRIDE_FORBIDDEN'});
+    try{return await assessmentAuthoringRuntime.publishAssessment(p,assessmentId,b);}catch(error){return assessmentAuthoringError(reply,error);}
   });
 
   async function learnerPrincipal(request:any, reply:any) {
