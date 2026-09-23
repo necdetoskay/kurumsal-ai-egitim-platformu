@@ -74,10 +74,10 @@ jobs:
           pnpm --filter @kaep/e2e exec playwright install --with-deps chromium
           pnpm --filter @kaep/e2e fixture > /tmp/kaep-e2e-fixture.log 2>&1 &
           FIXTURE_PID=$!
-          AUTH_JWKS_URL=http://127.0.0.1:4100/jwks AUTH_ISSUER=http://127.0.0.1:4100/ AUTH_AUDIENCE=kaep-e2e \
+          API_PORT=3001 AUTH_JWKS_URL=http://127.0.0.1:4100/jwks AUTH_ISSUER=http://127.0.0.1:4100/ AUTH_AUDIENCE=kaep-e2e \
             pnpm --filter @kaep/api exec tsx src/index.ts > /tmp/kaep-e2e-api.log 2>&1 &
           API_PID=$!
-          KAEP_API_TARGET=http://127.0.0.1:3000 \
+          KAEP_API_TARGET=http://127.0.0.1:3001 \
             pnpm --filter @kaep/web exec vite --host 127.0.0.1 --port 4173 > /tmp/kaep-e2e-web.log 2>&1 &
           WEB_PID=$!
           trap 'kill $FIXTURE_PID $API_PID $WEB_PID || true' EXIT
@@ -87,10 +87,10 @@ jobs:
           done
           curl --fail http://127.0.0.1:4100/health
           for i in {1..30}; do
-            curl --fail --silent http://127.0.0.1:3000/healthz >/dev/null && break
+            curl --fail --silent http://127.0.0.1:3001/healthz >/dev/null && break
             sleep 1
           done
-          curl --fail http://127.0.0.1:3000/healthz
+          curl --fail http://127.0.0.1:3001/healthz
           for i in {1..30}; do
             curl --fail --silent http://127.0.0.1:4173/ >/dev/null && break
             sleep 1
