@@ -55,6 +55,10 @@ async function main(){
     assert.equal(resume.progress.length,3);
     assert.equal(resume.progress.some((x:any)=>x.kind==='MODULE'&&x.completed===true&&x.progressPermille===1000),true);
     assert.equal(resume.progress.some((x:any)=>x.kind==='VIDEO'&&x.positionSeconds===48),true);
+    await reconnectDb.pool.query("update training_assignments set status='COMPLETED',completed_at=now() where tenant_id=$1 and id=$2",[tenantA,assignmentA]);
+    const completedResume=await reconnect.resume(pA,version);
+    assert.equal(completedResume.assignmentId,assignmentA);
+    assert.equal(completedResume.progress.length,3);
   } finally { await reconnectDb.close(); }
 
   console.log('Learner M2 PostgreSQL qualification PASS');
