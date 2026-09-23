@@ -88,9 +88,24 @@ export function createAudienceRuntime(database:DatabaseClient){
   async confirm(p:AudiencePrincipal,input:{organizationId:string;trainingId:string;trainingVersionId:string;targets:TrainingAudienceTarget[];resolutionFingerprint:string;idempotencyKey:string}){
    if(!input.idempotencyKey.trim())throw new AudienceRuntimeError('IDEMPOTENCY_CONFLICT');
    await assertTrainingVersion(p,input.trainingId,input.trainingVersionId);
+   const signature=`${input.trainingId}:${input.trainingVersionId}:${input.resolutionFingerprint}`;
+   const replay=await q('select resource_id,result_ref from command_idempotency where tenant_id=$1 and operation=$2 and idempotency_key=$3',[p.tenantId,AUDIENCE_CONFIRM_OPERATION,input.idempotencyKey]);
+   if(replay.rowCount){
+    if(replay.rows[0].result_ref!==signature)throw new AudienceRuntimeError('IDEMPOTENCY_CONFLICT');
+    return handoff(p.tenantId,replay.rows[0].resource_id);
+   }
    const preview=await resolver.preview({tenantId:p.tenantId,organizationId:input.organizationId,targets:input.targets});
    if(preview.fingerprint!==input.resolutionFingerprint)throw new AudienceRuntimeError('RESOLUTION_FINGERPRINT_MISMATCH');
-   const signature=`${input.trainingId}:${input.trainingVersionId}:${preview.fingerprint}`;
+   const existingResolution=await q(`select id from training_audience_resolutions
+     where tenant_id=$1 and training_version_id=$2 and fingerprint=$3 and status='CONFIRMED' limit 1`,
+     [p.tenantId,input.trainingVersionId,preview.fingerprint]);
+   if(existingResolution.rowCount){
+    const existingId=existingResolution.rows[0].id;
+    await q(`insert into command_idempotency(tenant_id,operation,idempotency_key,resource_id,result_ref)
+      values($1,$2,$3,$4,$5) on conflict(tenant_id,operation,idempotency_key) do nothing`,
+      [p.tenantId,AUDIENCE_CONFIRM_OPERATION,input.idempotencyKey,existingId,signature]);
+    return handoff(p.tenantId,existingId);
+   }
    const resolutionId=randomUUID();
    const client=await database.pool.connect();
    try{
