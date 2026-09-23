@@ -10,6 +10,7 @@ import { createAssessmentRuntime, AssessmentRuntimeError } from './assessment-ru
 import { createInsightRuntime, InsightRuntimeError } from './insight-runtime.js';
 import { createOrganizationAnalyticsRuntime, OrganizationAnalyticsError, type AnalyticsScopeType } from './organization-analytics-runtime.js';
 import { createAudienceRuntime, AudienceRuntimeError, TrainingAudienceInvariantError } from './audience-runtime.js';
+import { createTrainingRuntime, TrainingRuntimeError } from './training-runtime.js';
 
 export function buildApp(config: AppConfig) {
   const app = Fastify({
@@ -24,6 +25,7 @@ export function buildApp(config: AppConfig) {
   const insightRuntime = createInsightRuntime(database);
   const organizationAnalyticsRuntime = createOrganizationAnalyticsRuntime(database);
   const audienceRuntime = createAudienceRuntime(database);
+  const trainingRuntime = createTrainingRuntime(database);
   const redis = new Redis(config.REDIS_URL, {
     lazyConnect: true,
     maxRetriesPerRequest: 1,
@@ -72,6 +74,55 @@ export function buildApp(config: AppConfig) {
       request.log.error({ err: error }, 'audience assignment failed');
       return reply.code(500).send({ code: 'INTERNAL_ERROR' });
     }
+  });
+
+  async function trainingPrincipal(request:any,reply:any,permission:'training.read'|'training.create'|'training.edit'|'training.submit_review'|'training.publish') {
+    try {
+      const principal=await authenticate(request.headers.authorization);
+      if(!principal.permissions.includes(permission)) { reply.code(403).send({code:'INSUFFICIENT_PERMISSION'}); return null; }
+      return principal;
+    } catch(error) {
+      reply.code(401).send({code:error instanceof AuthenticationError?error.code:'TOKEN_INVALID'}); return null;
+    }
+  }
+  function trainingError(reply:any,error:unknown){
+    if(error instanceof TrainingRuntimeError){
+      const status=error.code==='TRAINING_NOT_FOUND'?404:error.code==='VERSION_CONFLICT'||error.code==='IDEMPOTENCY_CONFLICT'||error.code==='INVALID_STATE_TRANSITION'?409:422;
+      return reply.code(status).send({code:error.code});
+    }
+    throw error;
+  }
+  app.get('/api/v1/trainings',async(request,reply)=>{
+    const p=await trainingPrincipal(request,reply,'training.read');if(!p)return;
+    return {items:await trainingRuntime.listTrainings(p)};
+  });
+  app.post('/api/v1/trainings',async(request,reply)=>{
+    const p=await trainingPrincipal(request,reply,'training.create');if(!p)return;
+    const b=(request.body??{}) as any;
+    if('tenantId' in b)return reply.code(400).send({code:'CLIENT_TENANT_OVERRIDE_FORBIDDEN'});
+    try{return reply.code(201).send(await trainingRuntime.createTraining(p,b));}catch(error){return trainingError(reply,error);}
+  });
+  app.get('/api/v1/trainings/:trainingId',async(request,reply)=>{
+    const p=await trainingPrincipal(request,reply,'training.read');if(!p)return;
+    const {trainingId}=request.params as {trainingId:string};
+    try{return await trainingRuntime.getTraining(p,trainingId);}catch(error){return trainingError(reply,error);}
+  });
+  app.patch('/api/v1/trainings/:trainingId',async(request,reply)=>{
+    const p=await trainingPrincipal(request,reply,'training.edit');if(!p)return;
+    const {trainingId}=request.params as {trainingId:string};const b=(request.body??{}) as any;
+    if('tenantId' in b)return reply.code(400).send({code:'CLIENT_TENANT_OVERRIDE_FORBIDDEN'});
+    try{return await trainingRuntime.updateTraining(p,trainingId,b);}catch(error){return trainingError(reply,error);}
+  });
+  app.post('/api/v1/trainings/:trainingId/submit-review',async(request,reply)=>{
+    const p=await trainingPrincipal(request,reply,'training.submit_review');if(!p)return;
+    const {trainingId}=request.params as {trainingId:string};
+    try{return await trainingRuntime.submitReview(p,trainingId);}catch(error){return trainingError(reply,error);}
+  });
+  app.post('/api/v1/trainings/:trainingId/publish',async(request,reply)=>{
+    const p=await trainingPrincipal(request,reply,'training.publish');if(!p)return;
+    const {trainingId}=request.params as {trainingId:string};
+    const idempotencyKey=typeof request.headers['idempotency-key']==='string'?request.headers['idempotency-key']:'';
+    try{return await trainingRuntime.publish(p,trainingId,idempotencyKey);}catch(error){return trainingError(reply,error);}
   });
 
   async function learnerPrincipal(request:any, reply:any) {

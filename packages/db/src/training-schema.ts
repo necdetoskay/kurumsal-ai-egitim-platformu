@@ -39,6 +39,30 @@ export const trainingModules = pgTable('training_modules', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => ({
   tenantTrainingPositionUnique: uniqueIndex('training_modules_tenant_training_position_uq').on(table.tenantId, table.trainingId, table.position),
+  tenantTrainingIdUnique: unique('training_modules_tenant_training_id_uq').on(table.tenantId, table.trainingId, table.id),
+}));
+
+export const trainingContents = pgTable('training_contents', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+  trainingId: uuid('training_id').notNull(),
+  moduleId: uuid('module_id').notNull(),
+  title: text('title').notNull(),
+  type: text('type').notNull(),
+  position: integer('position').notNull(),
+  status: text('status').notNull().default('ACTIVE'),
+  durationSeconds: integer('duration_seconds'),
+  objectiveIds: jsonb('objective_ids').notNull().default([]),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  moduleScopeFk: foreignKey({
+    name: 'training_contents_tenant_training_module_fk',
+    columns: [table.tenantId, table.trainingId, table.moduleId],
+    foreignColumns: [trainingModules.tenantId, trainingModules.trainingId, trainingModules.id],
+  }).onDelete('restrict'),
+  tenantTrainingPositionUnique: uniqueIndex('training_contents_tenant_training_position_uq').on(table.tenantId, table.trainingId, table.position),
+  tenantTrainingIdx: index('training_contents_tenant_training_idx').on(table.tenantId, table.trainingId, table.status),
 }));
 
 export const trainingVersions = pgTable('training_versions', {
