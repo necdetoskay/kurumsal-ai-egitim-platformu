@@ -79,6 +79,12 @@ export function createTrainingRuntime(database:DatabaseClient){
        from trainings where tenant_id=$1 order by updated_at desc`,[p.tenantId])).rows;
    },
    getTraining:readDraft,
+   async listVersions(p:TrainingPrincipal,trainingId:string){
+     await readDraft(p,trainingId);
+     return (await q(`select id,version,published_at as "publishedAt" from training_versions
+       where tenant_id=$1 and training_id=$2 order by version desc`,[p.tenantId,trainingId])).rows;
+   },
+
    async createTraining(p:TrainingPrincipal,input:TrainingDraftInput){
      validateInput(input);
      const client=await database.pool.connect(); const cq:Query=(sql,params=[])=>client.query(sql,[...params]);
