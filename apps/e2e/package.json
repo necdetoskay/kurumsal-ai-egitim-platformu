@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "playwright test",
-    "fixture": "tsx src/fixture.ts"
+    "test": "node -e \"console.log('Browser MUR E2E runs in dedicated CI gate')\"",
+    "fixture": "tsx src/fixture.ts",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@playwright/test": "^1.55.0",
