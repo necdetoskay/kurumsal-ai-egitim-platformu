@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { DatabaseClient } from '@kaep/db';
-import { publishAssessment, type Assessment, type AssessmentQuestionSnapshot } from '@kaep/assessment';
+import { publishAssessment as publishAssessmentDomain, type Assessment, type AssessmentQuestionSnapshot } from '@kaep/assessment';
 
 export type AssessmentAuthorPrincipal={tenantId:string;userId:string};
 export class AssessmentAuthoringError extends Error {
@@ -95,7 +95,6 @@ export function createAssessmentAuthoringRuntime(database:DatabaseClient){
      if(!version)throw new AssessmentAuthoringError('TRAINING_VERSION_NOT_FOUND');
 
      const snapshots:Array<AssessmentQuestionSnapshot&{objectiveId:string}>=[];
-     let position=1;
      for(const item of input.questions){
        if(!item.questionVersionId||!item.objectiveId||!Number.isInteger(item.points)||Number(item.points)<=0)throw new AssessmentAuthoringError('INVALID_ASSESSMENT');
        const row=(await q(`select q.id as "questionId",q.status,v.id as "questionVersionId",v.prompt,v.options_json as options,v.correct_option_index as "correctOptionIndex"
@@ -106,10 +105,9 @@ export function createAssessmentAuthoringRuntime(database:DatabaseClient){
        const objective=(await q('select id from learning_objectives where tenant_id=$1 and training_id=$2 and id=$3 and status=\'ACTIVE\'',[p.tenantId,input.trainingId,item.objectiveId])).rows[0];
        if(!objective)throw new AssessmentAuthoringError('OBJECTIVE_NOT_FOUND');
        snapshots.push({questionId:row.questionId,questionVersionId:row.questionVersionId,prompt:row.prompt,options:row.options,correctOptionIndex:row.correctOptionIndex,points:Number(item.points),objectiveId:item.objectiveId});
-       position++;
      }
      const domain:Assessment={id:assessmentId,tenantId:p.tenantId,status:'DRAFT',snapshots:[],passPercent:current.passPercent};
-     try{publishAssessment(domain,snapshots);}
+     try{publishAssessmentDomain(domain,snapshots);}
      catch{throw new AssessmentAuthoringError('INVALID_ASSESSMENT');}
 
      const client=await database.pool.connect();
