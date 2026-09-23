@@ -22,9 +22,10 @@ export function createTrainingRuntime(database:DatabaseClient){
    const objectives=(await q('select id,statement,status from learning_objectives where tenant_id=$1 and training_id=$2 order by created_at,id',[p.tenantId,trainingId])).rows;
    const modules=(await q('select id,title,position,status from training_modules where tenant_id=$1 and training_id=$2 order by position,id',[p.tenantId,trainingId])).rows;
    const contents=(await q('select id,module_id as "moduleId",title,type,position,status,duration_seconds as "durationSeconds",objective_ids as "objectiveIds" from training_contents where tenant_id=$1 and training_id=$2 order by position,id',[p.tenantId,trainingId])).rows;
+   const versions=(await q('select id,version,published_at as "publishedAt" from training_versions where tenant_id=$1 and training_id=$2 order by version desc',[p.tenantId,trainingId])).rows;
    return {
      id:training.id,title:training.title,description:training.description,status:training.status,revision:training.revision,
-     objectives,modules:modules.map((m:any)=>({...m,contents:contents.filter((c:any)=>c.moduleId===m.id)})),
+     objectives,modules:modules.map((m:any)=>({...m,contents:contents.filter((c:any)=>c.moduleId===m.id)})),versions,
    };
  }
 
