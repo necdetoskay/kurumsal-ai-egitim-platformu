@@ -47,14 +47,15 @@ async function main(){
   await rejectCode(runtime.putProgress(pB,{assignmentId:assignmentA,trainingVersionId:version,kind:'MODULE',sourceId:moduleId,progressPermille:1}),'ASSIGNMENT_NOT_AVAILABLE');
   await rejectCode(runtime.putProgress(pA,{assignmentId:assignmentA,trainingVersionId:version,kind:'VIDEO',sourceId:textId,progressPermille:1}),'SOURCE_NOT_AVAILABLE');
 
-  const reconnect=createLearnerRuntime(createDatabase(env('DATABASE_URL')));
+  const reconnectDb=createDatabase(env('DATABASE_URL'));
+  const reconnect=createLearnerRuntime(reconnectDb);
   try{
     const resume=await reconnect.resume(pA,version);
     assert.equal(resume.assignmentId,assignmentA);
     assert.equal(resume.progress.length,3);
     assert.equal(resume.progress.some((x:any)=>x.kind==='MODULE'&&x.completed===true&&x.progressPermille===1000),true);
     assert.equal(resume.progress.some((x:any)=>x.kind==='VIDEO'&&x.positionSeconds===48),true);
-  } finally { await (reconnect as any); }
+  } finally { await reconnectDb.close(); }
 
   console.log('Learner M2 PostgreSQL qualification PASS');
  } finally { await db.close(); }
