@@ -2,9 +2,9 @@ import type { DatabaseClient } from '@kaep/db';
 
 export type AssessmentPrincipal={tenantId:string;userId:string};
 export class AssessmentRuntimeError extends Error {
-  constructor(public readonly code:'ASSESSMENT_NOT_ELIGIBLE'|'ATTEMPT_NOT_AVAILABLE'|'ATTEMPT_NOT_MUTABLE'|'QUESTION_NOT_AVAILABLE'|'INVALID_ANSWER'|'RETAKE_NOT_AVAILABLE'){super(code);}
+  constructor(public readonly code:'ASSESSMENT_NOT_ELIGIBLE'|'ATTEMPT_NOT_AVAILABLE'|'ATTEMPT_NOT_MUTABLE'|'QUESTION_NOT_AVAILABLE'|'INVALID_ANSWER'|'RETAKE_NOT_AVAILABLE'|'OBJECTIVE_LINEAGE_REQUIRED'){super(code);}
 }
-function safeQuestion(row:any){return {id:row.id,questionId:row.question_id,questionVersionId:row.question_version_id,position:row.position,prompt:row.prompt,options:row.options_json,points:row.points};}
+function safeQuestion(row:any){return {id:row.id,questionId:row.question_id,questionVersionId:row.question_version_id,objectiveId:row.objective_id??null,position:row.position,prompt:row.prompt,options:row.options_json,points:row.points};}
 
 export function createAssessmentRuntime(database:DatabaseClient){
  const q=(sql:string,params:readonly unknown[]=[])=>database.pool.query(sql,[...params]);
@@ -29,7 +29,7 @@ export function createAssessmentRuntime(database:DatabaseClient){
      where a.tenant_id=$1 and a.learner_id=$2 and a.status='ACTIVE' and s.status='PUBLISHED'`,[p.tenantId,p.userId])).rows;
    const items=[];
    for(const row of rows){
-    const questions=(await q('select id,question_id,question_version_id,position,prompt,options_json,points from assessment_question_snapshots where tenant_id=$1 and assessment_id=$2 order by position',[p.tenantId,row.id])).rows.map(safeQuestion);
+    const questions=(await q('select id,question_id,question_version_id,objective_id,position,prompt,options_json,points from assessment_question_snapshots where tenant_id=$1 and assessment_id=$2 order by position',[p.tenantId,row.id])).rows.map(safeQuestion);
     items.push({...row,questions});
    }
    return items;
@@ -57,7 +57,7 @@ export function createAssessmentRuntime(database:DatabaseClient){
      from attempts a join assessments s on s.tenant_id=a.tenant_id and s.id=a.assessment_id
      where a.tenant_id=$1 and a.id=$2 and a.learner_user_id=$3`,[p.tenantId,attemptId,p.userId])).rows[0];
    if(!attempt) throw new AssessmentRuntimeError('ATTEMPT_NOT_AVAILABLE');
-   const questions=(await q('select id,question_id,question_version_id,position,prompt,options_json,points from assessment_question_snapshots where tenant_id=$1 and assessment_id=$2 order by position',[p.tenantId,attempt.assessmentId])).rows.map(safeQuestion);
+   const questions=(await q('select id,question_id,question_version_id,objective_id,position,prompt,options_json,points from assessment_question_snapshots where tenant_id=$1 and assessment_id=$2 order by position',[p.tenantId,attempt.assessmentId])).rows.map(safeQuestion);
    const answers=(await q('select question_version_id as "questionVersionId",selected_option_index as "selectedOptionIndex",updated_at as "updatedAt" from attempt_answers where tenant_id=$1 and attempt_id=$2',[p.tenantId,attemptId])).rows;
    return {...attempt,passed:attempt.scorePercent==null?null:attempt.scorePercent>=attempt.passPercent,questions,answers};
   },
@@ -89,7 +89,7 @@ export function createAssessmentRuntime(database:DatabaseClient){
       return {attemptId,status:'COMPLETED',scorePercent:attempt.scorePercent,passed:attempt.scorePercent>=attempt.passPercent,replayed:true};
     }
     if(attempt.status!=='IN_PROGRESS')throw new AssessmentRuntimeError('ATTEMPT_NOT_MUTABLE');
-    const snapshots=(await client.query('select question_version_id,correct_option_index,points from assessment_question_snapshots where tenant_id=$1 and assessment_id=$2',[p.tenantId,attempt.assessmentId])).rows;
+    const snapshots=(await client.query('select question_version_id,objective_id,correct_option_index,points from assessment_question_snapshots where tenant_id=$1 and assessment_id=$2',[p.tenantId,attempt.assessmentId])).rows;
     const answers=(await client.query('select question_version_id,selected_option_index from attempt_answers where tenant_id=$1 and attempt_id=$2',[p.tenantId,attemptId])).rows;
     const amap=new Map(answers.map((x:any)=>[x.question_version_id,x.selected_option_index]));
     const total=snapshots.reduce((n:number,x:any)=>n+x.points,0);
@@ -108,6 +108,18 @@ export function createAssessmentRuntime(database:DatabaseClient){
     await client.query(`insert into learning_evidence(tenant_id,assignment_id,learner_id,training_id,training_version_id,type,source_id,payload,occurred_at)
       values($1,$2,$3,$4,$5,'ASSESSMENT_RESULT',$6,$7::jsonb,now())
       on conflict(tenant_id,assignment_id,type,source_id) do nothing`,[p.tenantId,eligible.assignmentId,p.userId,eligible.trainingId,eligible.trainingVersionId,attemptId,JSON.stringify({assessmentId:attempt.assessmentId,scorePercent,passed})]);
+
+    for(const snapshot of snapshots){
+      if(!snapshot.objective_id) throw new AssessmentRuntimeError('OBJECTIVE_LINEAGE_REQUIRED');
+      const objective=await client.query('select id from learning_objectives where tenant_id=$1 and training_id=$2 and id=$3',[p.tenantId,eligible.trainingId,snapshot.objective_id]);
+      if(!objective.rowCount) throw new AssessmentRuntimeError('OBJECTIVE_LINEAGE_REQUIRED');
+      const correct=amap.get(snapshot.question_version_id)===snapshot.correct_option_index;
+      await client.query(`insert into objective_evidence
+        (tenant_id,assignment_id,learner_id,training_id,training_version_id,objective_id,assessment_id,attempt_id,question_version_id,earned_points,possible_points,correct)
+        values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+        on conflict(tenant_id,attempt_id,question_version_id) do nothing`,
+        [p.tenantId,eligible.assignmentId,p.userId,eligible.trainingId,eligible.trainingVersionId,snapshot.objective_id,attempt.assessmentId,attemptId,snapshot.question_version_id,correct?snapshot.points:0,snapshot.points,correct]);
+    }
 
     const requiredModules=(eligible.snapshot?.modules??[]).filter((x:any)=>x?.active!==false).map((x:any)=>x.id);
     const completed=requiredModules.length===0?true:Number((await client.query(`select count(*)::int as count from learning_progress where tenant_id=$1 and assignment_id=$2 and kind='MODULE' and completed=true and source_id=any($3::text[])`,[p.tenantId,eligible.assignmentId,requiredModules])).rows[0]?.count??0)===requiredModules.length;

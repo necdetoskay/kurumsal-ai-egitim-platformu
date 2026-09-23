@@ -24,6 +24,7 @@ export const learningObjectives = pgTable('learning_objectives', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => ({
+  tenantIdIdUq: unique('learning_objectives_tenant_id_id_uq').on(table.tenantId, table.id),
   tenantTrainingIdx: index('learning_objectives_tenant_training_idx').on(table.tenantId, table.trainingId),
 }));
 
