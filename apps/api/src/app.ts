@@ -107,6 +107,11 @@ export function buildApp(config: AppConfig) {
     const {trainingId}=request.params as {trainingId:string};
     try{return await trainingRuntime.getTraining(p,trainingId);}catch(error){return trainingError(reply,error);}
   });
+  app.get('/api/v1/trainings/:trainingId/versions',async(request,reply)=>{
+    const p=await trainingPrincipal(request,reply,'training.read');if(!p)return;
+    const {trainingId}=request.params as {trainingId:string};
+    try{return {items:await trainingRuntime.listVersions(p,trainingId)};}catch(error){return trainingError(reply,error);}
+  });
   app.patch('/api/v1/trainings/:trainingId',async(request,reply)=>{
     const p=await trainingPrincipal(request,reply,'training.edit');if(!p)return;
     const {trainingId}=request.params as {trainingId:string};const b=(request.body??{}) as any;
