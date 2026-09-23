@@ -214,7 +214,8 @@ export function buildApp(config: AppConfig) {
     const scopeId=typeof q.scopeId==='string'?q.scopeId:undefined;
     const trainingVersionId=typeof q.trainingVersionId==='string'?q.trainingVersionId:undefined;
     if(!scopeType||!['ORGANIZATION','COMPANY','DEPARTMENT','GROUP'].includes(scopeType)||!scopeId)return reply.code(400).send({code:'INVALID_ANALYTICS_SCOPE'});
-    try { return await organizationAnalyticsRuntime.getAggregate(p,{scopeType,scopeId,trainingVersionId}); }
+    const input=trainingVersionId?{scopeType,scopeId,trainingVersionId}:{scopeType,scopeId};
+    try { return await organizationAnalyticsRuntime.getAggregate(p,input); }
     catch(error){ if(error instanceof OrganizationAnalyticsError)return reply.code(404).send({code:error.code}); throw error; }
   });
 
