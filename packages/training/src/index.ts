@@ -18,11 +18,24 @@ export interface TrainingModule {
   active: boolean;
 }
 
+export interface TrainingContentItem {
+  id: string;
+  tenantId: string;
+  trainingId: string;
+  moduleId: string;
+  title: string;
+  type: 'TEXT' | 'VIDEO';
+  position: number;
+  active: boolean;
+  durationSeconds?: number;
+}
+
 export interface TrainingSnapshot {
   title: string;
   description?: string;
   objectives: readonly LearningObjective[];
   modules: readonly TrainingModule[];
+  contents?: readonly TrainingContentItem[];
 }
 
 export interface TrainingVersion {
@@ -43,6 +56,7 @@ export interface TrainingAggregateState {
   revision: number;
   objectives: readonly LearningObjective[];
   modules: readonly TrainingModule[];
+  contents?: readonly TrainingContentItem[];
   publishedVersions: readonly TrainingVersion[];
 }
 
@@ -77,6 +91,11 @@ export function validateTrainingOwnership(state: TrainingAggregateState): void {
       throw new TrainingDomainError('TENANT_BOUNDARY_VIOLATION');
     }
   }
+  for (const content of state.contents ?? []) {
+    if (content.tenantId !== state.tenantId || content.trainingId !== state.id || !state.modules.some((module) => module.id === content.moduleId)) {
+      throw new TrainingDomainError('TENANT_BOUNDARY_VIOLATION');
+    }
+  }
 }
 
 export function validatePublishReadiness(state: TrainingAggregateState): void {
@@ -105,6 +124,7 @@ export function publishTraining(input: {
       ...(input.state.description !== undefined ? { description: input.state.description } : {}),
       objectives: Object.freeze(input.state.objectives.map((item) => Object.freeze({ ...item }))),
       modules: Object.freeze(input.state.modules.map((item) => Object.freeze({ ...item }))),
+      ...(input.state.contents ? { contents: Object.freeze(input.state.contents.map((item) => Object.freeze({ ...item }))) } : {}),
     }),
   });
   return {
