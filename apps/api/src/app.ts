@@ -7,6 +7,7 @@ import { createAuthenticator, AuthenticationError } from './authentication.js';
 import { createOrganizationRuntime } from './organization-runtime.js';
 import { createLearnerRuntime, LearnerRuntimeError, type ProgressKind } from './learner-runtime.js';
 import { createAssessmentRuntime, AssessmentRuntimeError } from './assessment-runtime.js';
+import { createInsightRuntime, InsightRuntimeError } from './insight-runtime.js';
 
 export function buildApp(config: AppConfig) {
   const app = Fastify({
@@ -18,6 +19,7 @@ export function buildApp(config: AppConfig) {
   const organizationRuntime = createOrganizationRuntime(database);
   const learnerRuntime = createLearnerRuntime(database);
   const assessmentRuntime = createAssessmentRuntime(database);
+  const insightRuntime = createInsightRuntime(database);
   const redis = new Redis(config.REDIS_URL, {
     lazyConnect: true,
     maxRetriesPerRequest: 1,
@@ -127,6 +129,14 @@ export function buildApp(config: AppConfig) {
     const {trainingVersionId}=request.params as {trainingVersionId:string};
     try { return await learnerRuntime.resume(p,trainingVersionId); }
     catch(error){ return learnerError(reply,error); }
+  });
+
+  app.get('/api/v1/learner/insights',async(request,reply)=>{
+    const p=await learnerPrincipal(request,reply);if(!p)return;
+    const {trainingVersionId}=request.query as {trainingVersionId?:string};
+    if(!trainingVersionId)return reply.code(400).send({code:'TRAINING_VERSION_REQUIRED'});
+    try{return await insightRuntime.getInsights(p,trainingVersionId);}
+    catch(error){if(error instanceof InsightRuntimeError)return reply.code(404).send({code:error.code});throw error;}
   });
 
   function assessmentError(reply:any,error:unknown){
