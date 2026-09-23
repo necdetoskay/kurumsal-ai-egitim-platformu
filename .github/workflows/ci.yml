@@ -47,8 +47,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      # TODO(D005): generate and commit pnpm-lock.yaml, then restore --frozen-lockfile.
+      # M8 bootstrap: capture the generated lockfile once, then commit it and switch this gate to --frozen-lockfile.
       - run: pnpm install --no-frozen-lockfile
+      - name: Capture generated lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: m8-generated-lockfile
+          path: pnpm-lock.yaml
+          if-no-files-found: error
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
@@ -56,9 +62,9 @@ jobs:
       - run: pnpm db:migrate
       - name: M1 PostgreSQL integration
         run: pnpm --filter @kaep/api test:db
-      - name: Readiness smoke
+      - name: Built API readiness smoke
         run: |
-          pnpm --filter @kaep/api dev > /tmp/kaep-api.log 2>&1 &
+          NODE_OPTIONS=--conditions=production node apps/api/dist/index.js > /tmp/kaep-api.log 2>&1 &
           API_PID=$!
           trap 'kill $API_PID || true' EXIT
           for i in {1..20}; do
@@ -74,11 +80,11 @@ jobs:
           pnpm --filter @kaep/e2e exec playwright install --with-deps chromium
           pnpm --filter @kaep/e2e fixture > /tmp/kaep-e2e-fixture.log 2>&1 &
           FIXTURE_PID=$!
-          API_PORT=3001 AUTH_JWKS_URL=http://127.0.0.1:4100/jwks AUTH_ISSUER=http://127.0.0.1:4100/ AUTH_AUDIENCE=kaep-e2e \
-            pnpm --filter @kaep/api exec tsx src/index.ts > /tmp/kaep-e2e-api.log 2>&1 &
+          API_PORT=3001 AUTH_JWKS_URL=http://127.0.0.1:4100/jwks AUTH_ISSUER=http://127.0.0.1:4100/ AUTH_AUDIENCE=kaep-e2e NODE_OPTIONS=--conditions=production \
+            node apps/api/dist/index.js > /tmp/kaep-e2e-api.log 2>&1 &
           API_PID=$!
           KAEP_API_TARGET=http://127.0.0.1:3001 \
-            pnpm --filter @kaep/web exec vite --host 127.0.0.1 --port 4173 > /tmp/kaep-e2e-web.log 2>&1 &
+            pnpm --filter @kaep/web exec vite preview --host 127.0.0.1 --port 4173 > /tmp/kaep-e2e-web.log 2>&1 &
           WEB_PID=$!
           trap 'kill $FIXTURE_PID $API_PID $WEB_PID || true' EXIT
           for i in {1..30}; do
@@ -97,6 +103,25 @@ jobs:
           done
           curl --fail http://127.0.0.1:4173/
           pnpm --filter @kaep/e2e test:e2e
+          pnpm --filter @kaep/e2e test:perf
+      - name: PostgreSQL backup and restore drill
+        run: |
+          mkdir -p /tmp/kaep-backup
+          docker run --rm --network host -e PGPASSWORD=kaep -v /tmp/kaep-backup:/backup postgres:17-alpine \
+            pg_dump -h 127.0.0.1 -U kaep -d kaep -Fc -f /backup/kaep.dump
+          docker run --rm --network host -e PGPASSWORD=kaep postgres:17-alpine \
+            psql -h 127.0.0.1 -U kaep -d postgres -v ON_ERROR_STOP=1 -c "drop database if exists kaep_restore"
+          docker run --rm --network host -e PGPASSWORD=kaep postgres:17-alpine \
+            psql -h 127.0.0.1 -U kaep -d postgres -v ON_ERROR_STOP=1 -c "create database kaep_restore"
+          docker run --rm --network host -e PGPASSWORD=kaep -v /tmp/kaep-backup:/backup postgres:17-alpine \
+            pg_restore -h 127.0.0.1 -U kaep -d kaep_restore --no-owner --no-privileges /backup/kaep.dump
+          for table in trainings training_versions training_assignments attempts certificates; do
+            source_count=$(docker run --rm --network host -e PGPASSWORD=kaep postgres:17-alpine psql -h 127.0.0.1 -U kaep -d kaep -Atc "select count(*) from $table")
+            restored_count=$(docker run --rm --network host -e PGPASSWORD=kaep postgres:17-alpine psql -h 127.0.0.1 -U kaep -d kaep_restore -Atc "select count(*) from $table")
+            test "$source_count" = "$restored_count"
+          done
+          restored_tables=$(docker run --rm --network host -e PGPASSWORD=kaep postgres:17-alpine psql -h 127.0.0.1 -U kaep -d kaep_restore -Atc "select count(*) from information_schema.tables where table_schema='public'")
+          test "$restored_tables" -gt 20
       - name: Upload MUR E2E evidence
         if: failure()
         uses: actions/upload-artifact@v4
