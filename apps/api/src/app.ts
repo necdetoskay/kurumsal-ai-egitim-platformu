@@ -6,6 +6,7 @@ import { persistConfirmedAudienceAssignments, AudienceAssignmentPersistenceError
 import { createAuthenticator, AuthenticationError } from './authentication.js';
 import { createOrganizationRuntime } from './organization-runtime.js';
 import { createLearnerRuntime, LearnerRuntimeError, type ProgressKind } from './learner-runtime.js';
+import { createAssessmentRuntime, AssessmentRuntimeError } from './assessment-runtime.js';
 
 export function buildApp(config: AppConfig) {
   const app = Fastify({
@@ -16,6 +17,7 @@ export function buildApp(config: AppConfig) {
   const authenticate = createAuthenticator(config, database);
   const organizationRuntime = createOrganizationRuntime(database);
   const learnerRuntime = createLearnerRuntime(database);
+  const assessmentRuntime = createAssessmentRuntime(database);
   const redis = new Redis(config.REDIS_URL, {
     lazyConnect: true,
     maxRetriesPerRequest: 1,
@@ -125,6 +127,50 @@ export function buildApp(config: AppConfig) {
     const {trainingVersionId}=request.params as {trainingVersionId:string};
     try { return await learnerRuntime.resume(p,trainingVersionId); }
     catch(error){ return learnerError(reply,error); }
+  });
+
+  function assessmentError(reply:any,error:unknown){
+    if(error instanceof AssessmentRuntimeError){
+      const status=error.code==='INVALID_ANSWER'?400:error.code==='ATTEMPT_NOT_MUTABLE'?409:404;
+      return reply.code(status).send({code:error.code});
+    }
+    throw error;
+  }
+  app.get('/api/v1/learner/assessments',async(request,reply)=>{
+    const p=await learnerPrincipal(request,reply);if(!p)return;
+    return {items:await assessmentRuntime.listAssessments(p)};
+  });
+  app.post('/api/v1/assessments/:assessmentId/attempts',async(request,reply)=>{
+    const p=await learnerPrincipal(request,reply);if(!p)return;
+    const {assessmentId}=request.params as {assessmentId:string};
+    try{return reply.code(201).send(await assessmentRuntime.startAttempt(p,assessmentId));}
+    catch(error){return assessmentError(reply,error);}
+  });
+  app.get('/api/v1/attempts/:attemptId',async(request,reply)=>{
+    const p=await learnerPrincipal(request,reply);if(!p)return;
+    const {attemptId}=request.params as {attemptId:string};
+    try{return await assessmentRuntime.getAttempt(p,attemptId);}catch(error){return assessmentError(reply,error);}
+  });
+  app.put('/api/v1/attempts/:attemptId/answers/:questionVersionId',async(request,reply)=>{
+    const p=await learnerPrincipal(request,reply);if(!p)return;
+    const {attemptId,questionVersionId}=request.params as {attemptId:string;questionVersionId:string};
+    const b=(request.body??{}) as any;
+    if('tenantId' in b||'learnerId' in b)return reply.code(400).send({code:'CLIENT_IDENTITY_OVERRIDE_FORBIDDEN'});
+    try{return await assessmentRuntime.saveAnswer(p,attemptId,questionVersionId,b.selectedOptionIndex);}catch(error){return assessmentError(reply,error);}
+  });
+  app.post('/api/v1/attempts/:attemptId/submit',async(request,reply)=>{
+    const p=await learnerPrincipal(request,reply);if(!p)return;
+    const {attemptId}=request.params as {attemptId:string};
+    try{return await assessmentRuntime.submitAttempt(p,attemptId);}catch(error){return assessmentError(reply,error);}
+  });
+  app.post('/api/v1/attempts/:attemptId/retake',async(request,reply)=>{
+    const p=await learnerPrincipal(request,reply);if(!p)return;
+    const {attemptId}=request.params as {attemptId:string};
+    try{return reply.code(201).send(await assessmentRuntime.requestRetake(p,attemptId));}catch(error){return assessmentError(reply,error);}
+  });
+  app.get('/api/v1/learner/certificates',async(request,reply)=>{
+    const p=await learnerPrincipal(request,reply);if(!p)return;
+    return {items:await assessmentRuntime.listCertificates(p)};
   });
 
   async function adminPrincipal(request:any, reply:any) {
