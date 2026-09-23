@@ -57,7 +57,12 @@ export function createOrganizationRuntime(database: DatabaseClient) {
       return { ...org, companies: companies.map((company:any)=>({...company,departments:departments.filter((d:any)=>d.company_id===company.id)})) };
     },
     async listEmployees(p: OrgPrincipal, organizationId:string) {
-      return (await q('select * from employees where tenant_id=$1 and organization_id=$2 order by last_name,first_name',[p.tenantId,organizationId])).rows;
+      return (await q(`select e.*,l.user_id as "linkedUserId",u.email as "linkedUserEmail"
+        from employees e
+        left join employee_user_links l on l.tenant_id=e.tenant_id and l.employee_id=e.id and l.valid_until is null
+        left join users u on u.id=l.user_id
+        where e.tenant_id=$1 and e.organization_id=$2
+        order by e.last_name,e.first_name`,[p.tenantId,organizationId])).rows;
     },
     async listGroups(p: OrgPrincipal, organizationId:string) {
       return (await q('select * from groups where tenant_id=$1 and organization_id=$2 order by name',[p.tenantId,organizationId])).rows;
@@ -84,6 +89,27 @@ export function createOrganizationRuntime(database: DatabaseClient) {
           select $1,id,$3,$4,$5,$6,$7,$8 from organizations where tenant_id=$1 and id=$2 returning *`,
           [p.tenantId,organizationId,input.employeeNo??null,input.firstName,input.lastName,input.email??null,input.phone??null,input.hireDate??null]);
         return r.rows[0]??null;
+      });
+    },
+    async linkEmployeeUser(p: OrgPrincipal, employeeId:string, userId:string) {
+      return audited(p,'EMPLOYEE_USER_LINKED','EMPLOYEE_USER_LINK','EMPLOYEE',employeeId,async query=>{
+        const employee=(await query('select id from employees where tenant_id=$1 and id=$2',[p.tenantId,employeeId])).rows[0];
+        if(!employee)return null;
+        const membership=(await query("select user_id from memberships where tenant_id=$1 and user_id=$2 and status='active'",[p.tenantId,userId])).rows[0];
+        if(!membership)return null;
+        const current=(await query('select * from employee_user_links where tenant_id=$1 and employee_id=$2 and valid_until is null',[p.tenantId,employeeId])).rows[0];
+        if(current?.user_id===userId)return current;
+        if(current)throw new Error('EMPLOYEE_ALREADY_LINKED');
+        const userLink=(await query('select employee_id from employee_user_links where tenant_id=$1 and user_id=$2 and valid_until is null',[p.tenantId,userId])).rows[0];
+        if(userLink)throw new Error('USER_ALREADY_LINKED');
+        return (await query(`insert into employee_user_links(tenant_id,employee_id,user_id,created_by_user_id)
+          values($1,$2,$3,$4) returning *`,[p.tenantId,employeeId,userId,p.userId])).rows[0];
+      });
+    },
+    async unlinkEmployeeUser(p: OrgPrincipal, employeeId:string) {
+      return audited(p,'EMPLOYEE_USER_UNLINKED','EMPLOYEE_USER_LINK','EMPLOYEE',employeeId,async query=>{
+        return (await query(`update employee_user_links set valid_until=now()
+          where tenant_id=$1 and employee_id=$2 and valid_until is null returning *`,[p.tenantId,employeeId])).rows[0]??null;
       });
     },
     async startEmployment(p: OrgPrincipal, employeeId:string, input:any) {
