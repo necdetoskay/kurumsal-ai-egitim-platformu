@@ -5,6 +5,7 @@ import type { AppConfig } from '@kaep/config';
 import { persistConfirmedAudienceAssignments, AudienceAssignmentPersistenceError } from './audience-assignment-persistence.js';
 
 type TrustedAudiencePrincipal = { tenantId: string; userId: string; role: 'tenant_admin' | 'instructor' };
+type TrustedLearnerPrincipal = { tenantId: string; userId: string; role: 'learner' };
 
 function trustedAudiencePrincipal(headers: Record<string, string | string[] | undefined>): TrustedAudiencePrincipal | null {
   // Temporary trusted-edge adapter: production ingress must strip client-supplied
@@ -14,6 +15,13 @@ function trustedAudiencePrincipal(headers: Record<string, string | string[] | un
   const role = headers['x-kaep-role'];
   if (!tenantId || !userId || (role !== 'tenant_admin' && role !== 'instructor')) return null;
   return { tenantId, userId, role };
+}
+
+function trustedLearnerPrincipal(headers: Record<string, string | string[] | undefined>): TrustedLearnerPrincipal | null {
+  const tenantId = typeof headers['x-kaep-tenant-id'] === 'string' ? headers['x-kaep-tenant-id'].trim() : '';
+  const userId = typeof headers['x-kaep-user-id'] === 'string' ? headers['x-kaep-user-id'].trim() : '';
+  if (!tenantId || !userId || headers['x-kaep-role'] !== 'learner') return null;
+  return { tenantId, userId, role: 'learner' };
 }
 
 export function buildApp(config: AppConfig) {
@@ -68,6 +76,89 @@ export function buildApp(config: AppConfig) {
       request.log.error({ err: error }, 'audience assignment failed');
       return reply.code(500).send({ code: 'INTERNAL_ERROR' });
     }
+  });
+
+  app.get('/api/v1/learner/assignments', async (request, reply) => {
+    const principal = trustedLearnerPrincipal(request.headers);
+    if (!principal) return reply.code(401).send({ code: 'SESSION_REQUIRED' });
+    const result = await database.pool.query(
+      `select a.id, a.training_id as "trainingId", a.training_version_id as "trainingVersionId",
+              a.status, a.assigned_at as "assignedAt", a.completed_at as "completedAt",
+              t.title, t.description
+         from training_assignments a
+         join trainings t on t.id = a.training_id and t.tenant_id = a.tenant_id
+        where a.tenant_id = $1 and a.learner_id = $2
+        order by a.assigned_at desc`,
+      [principal.tenantId, principal.userId],
+    );
+    return { items: result.rows };
+  });
+
+  app.get('/api/v1/learner/trainings/:trainingId', async (request, reply) => {
+    const principal = trustedLearnerPrincipal(request.headers);
+    if (!principal) return reply.code(401).send({ code: 'SESSION_REQUIRED' });
+    const { trainingId } = request.params as { trainingId: string };
+    const result = await database.pool.query(
+      `select a.id as "assignmentId", a.training_id as "trainingId",
+              a.training_version_id as "trainingVersionId", a.status,
+              t.title, t.description, v.version, v.snapshot
+         from training_assignments a
+         join trainings t on t.id = a.training_id and t.tenant_id = a.tenant_id
+         join training_versions v on v.id = a.training_version_id and v.training_id = a.training_id and v.tenant_id = a.tenant_id
+        where a.tenant_id = $1 and a.learner_id = $2 and a.training_id = $3
+        order by a.assigned_at desc limit 1`,
+      [principal.tenantId, principal.userId, trainingId],
+    );
+    if (!result.rowCount) return reply.code(404).send({ code: 'TRAINING_NOT_ASSIGNED' });
+    return result.rows[0];
+  });
+
+  app.put('/api/v1/learner/progress/:trainingVersionId', async (request, reply) => {
+    const principal = trustedLearnerPrincipal(request.headers);
+    if (!principal) return reply.code(401).send({ code: 'SESSION_REQUIRED' });
+    const { trainingVersionId } = request.params as { trainingVersionId: string };
+    const body = (request.body ?? {}) as { assignmentId?: string; sourceId?: string; completed?: boolean; tenantId?: string; learnerId?: string };
+    if ('tenantId' in body || 'learnerId' in body) return reply.code(400).send({ code: 'CLIENT_IDENTITY_OVERRIDE_FORBIDDEN' });
+    if (!body.assignmentId || !body.sourceId) return reply.code(400).send({ code: 'INVALID_REQUEST' });
+
+    const assignment = await database.pool.query(
+      `select id, training_id from training_assignments
+        where id = $1 and tenant_id = $2 and learner_id = $3 and training_version_id = $4 and status = 'ACTIVE'`,
+      [body.assignmentId, principal.tenantId, principal.userId, trainingVersionId],
+    );
+    if (!assignment.rowCount) return reply.code(404).send({ code: 'ASSIGNMENT_NOT_AVAILABLE' });
+
+    const payload = JSON.stringify({ completed: body.completed === true });
+    const written = await database.pool.query(
+      `insert into learning_evidence
+        (tenant_id, assignment_id, learner_id, training_id, training_version_id, type, source_id, payload, occurred_at)
+       values ($1,$2,$3,$4,$5,'MODULE_COMPLETED',$6,$7::jsonb,now())
+       on conflict (tenant_id, assignment_id, type, source_id) do nothing
+       returning id, occurred_at as "occurredAt"`,
+      [principal.tenantId, body.assignmentId, principal.userId, assignment.rows[0].training_id, trainingVersionId, body.sourceId, payload],
+    );
+    if (written.rowCount) return reply.code(201).send({ replayed: false, evidence: written.rows[0] });
+    const existing = await database.pool.query(
+      `select id, occurred_at as "occurredAt", payload from learning_evidence
+        where tenant_id=$1 and assignment_id=$2 and type='MODULE_COMPLETED' and source_id=$3`,
+      [principal.tenantId, body.assignmentId, body.sourceId],
+    );
+    return reply.code(200).send({ replayed: true, evidence: existing.rows[0] });
+  });
+
+  app.get('/api/v1/learner/trainings/:trainingVersionId/resume', async (request, reply) => {
+    const principal = trustedLearnerPrincipal(request.headers);
+    if (!principal) return reply.code(401).send({ code: 'SESSION_REQUIRED' });
+    const { trainingVersionId } = request.params as { trainingVersionId: string };
+    const result = await database.pool.query(
+      `select e.source_id as "sourceId", e.payload, e.occurred_at as "occurredAt"
+         from learning_evidence e
+         join training_assignments a on a.id=e.assignment_id and a.tenant_id=e.tenant_id
+        where e.tenant_id=$1 and e.learner_id=$2 and e.training_version_id=$3
+        order by e.occurred_at desc`,
+      [principal.tenantId, principal.userId, trainingVersionId],
+    );
+    return { trainingVersionId, progress: result.rows };
   });
 
   app.get('/readyz', async (_request, reply) => {
