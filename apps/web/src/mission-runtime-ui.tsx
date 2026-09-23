@@ -93,7 +93,7 @@ export function AudienceRuntimeView(){
   </section>
   {preview&&<section className="content-card" data-testid="audience-preview-result"><h2>Preview</h2><p>Tekil personel: <strong>{preview.uniqueEmployeeCount}</strong> · atanabilir öğrenen: <strong>{preview.assignableLearnerCount}</strong> · çakışma: {preview.overlapCount}</p><p>Bağlı olmayan personel: {preview.unlinkedEmployeeIds.length}</p><button type="button" data-testid="audience-confirm" onClick={()=>void confirm()}>Immutable kitleyi onayla</button></section>}
   {handoff&&<section className="content-card" data-testid="audience-confirm-result"><h2>Resolution #{handoff.resolutionId.slice(0,8)}</h2><p>Assignment adayı: {handoff.assignmentCandidateLearnerIds.length} · bağlı olmayan: {handoff.unlinkedEmployeeIds.length}</p><button type="button" data-testid="audience-assign" disabled={handoff.assignmentCandidateLearnerIds.length===0} onClick={()=>void assign()}>Atamaları oluştur</button></section>}
-  {assigned&&<section className="content-card safety-card" data-testid="audience-assigned"><h2>Atamalar kalıcılaştırıldı</h2><pre>{JSON.stringify(assigned.result??assigned,null,2)}</pre></section>}
+  {assigned&&<section className="content-card safety-card" data-testid="audience-assigned"><h2>Atamalar kalıcılaştırıldı</h2><p data-testid="audience-assignment-replay">Replay: {String(Boolean(assigned.replayed))}</p><pre>{JSON.stringify(assigned.result??assigned,null,2)}</pre></section>}
  </div>;
 }
 
