@@ -177,4 +177,14 @@ test.describe.serial('AEGIS MUR M7 browser mission',()=>{
    await expect(page.getByTestId('learner-training')).toContainText('MUR E2E Phishing');
    await expect(page.getByTestId('resume-state')).toContainText('Tamamlanan öğe: 1');
  });
+ test('MUR-E2E-005 security boundary regression',async({request})=>{
+   const spoof=await request.get('/api/v1/organizations',{headers:{'x-kaep-tenant-id':fixture.tenantId,'x-kaep-user-id':fixture.users.admin.id,'x-kaep-role':'tenant_admin'}});
+   expect(spoof.status()).toBe(401);
+   const invalid=await request.get('/api/v1/organizations',{headers:{authorization:'Bearer invalid-token'}});
+   expect(invalid.status()).toBe(401);
+   const override=await request.post('/api/v1/training-audiences/preview',{headers:{authorization:`Bearer ${fixture.users.admin.token}`,'content-type':'application/json'},data:{tenantId:fixture.otherTenantId,organizationId:fixture.organizationId,trainingId:mission.trainingId,trainingVersionId:mission.versionId,targets:[{type:'ORGANIZATION',id:fixture.organizationId}]}});
+   expect(override.status()).toBe(400);
+   expect(await override.json()).toMatchObject({code:'CLIENT_IDENTITY_OVERRIDE_FORBIDDEN'});
+ });
+
 });

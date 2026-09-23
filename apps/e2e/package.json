@@ -7,7 +7,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node -e \"console.log('Browser MUR E2E runs in dedicated CI gate')\"",
     "fixture": "tsx src/fixture.ts",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:perf": "tsx src/performance.ts"
   },
   "dependencies": {
     "@playwright/test": "^1.55.0",
