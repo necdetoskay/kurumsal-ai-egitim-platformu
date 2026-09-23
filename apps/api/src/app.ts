@@ -4,6 +4,7 @@ import { createDatabase } from '@kaep/db';
 import type { AppConfig } from '@kaep/config';
 import { persistConfirmedAudienceAssignments, AudienceAssignmentPersistenceError } from './audience-assignment-persistence.js';
 import { createAuthenticator, AuthenticationError } from './authentication.js';
+import { createOrganizationRuntime } from './organization-runtime.js';
 
 export function buildApp(config: AppConfig) {
   const app = Fastify({
@@ -12,6 +13,7 @@ export function buildApp(config: AppConfig) {
 
   const database = createDatabase(config.DATABASE_URL);
   const authenticate = createAuthenticator(config, database);
+  const organizationRuntime = createOrganizationRuntime(database);
   const redis = new Redis(config.REDIS_URL, {
     lazyConnect: true,
     maxRetriesPerRequest: 1,
@@ -152,6 +154,27 @@ export function buildApp(config: AppConfig) {
     );
     return { trainingVersionId, progress: result.rows };
   });
+
+  async function adminPrincipal(request:any, reply:any) {
+    try {
+      const principal=await authenticate(request.headers.authorization);
+      if (!principal.roleCodes.includes('tenant_admin')) { reply.code(403).send({code:'FORBIDDEN'}); return null; }
+      return principal;
+    } catch (error) {
+      reply.code(401).send({code:error instanceof AuthenticationError ? error.code : 'TOKEN_INVALID'}); return null;
+    }
+  }
+  app.get('/api/v1/organizations', async (request,reply)=>{ const p=await adminPrincipal(request,reply); if(!p)return; return {items:await organizationRuntime.listOrganizations(p)}; });
+  app.post('/api/v1/organizations', async (request,reply)=>{ const p=await adminPrincipal(request,reply); if(!p)return; const b:any=request.body??{}; if(!b.name||!b.code)return reply.code(400).send({code:'INVALID_REQUEST'}); return reply.code(201).send(await organizationRuntime.createOrganization(p,b)); });
+  app.get('/api/v1/organizations/:organizationId/tree', async (request,reply)=>{ const p=await adminPrincipal(request,reply); if(!p)return; const {organizationId}=request.params as any; const v=await organizationRuntime.getOrganizationTree(p,organizationId); return v??reply.code(404).send({code:'ORGANIZATION_NOT_FOUND'}); });
+  app.post('/api/v1/organizations/:organizationId/companies', async (request,reply)=>{ const p=await adminPrincipal(request,reply); if(!p)return; const {organizationId}=request.params as any; const v=await organizationRuntime.createCompany(p,organizationId,request.body??{}); return v?reply.code(201).send(v):reply.code(404).send({code:'ORGANIZATION_NOT_FOUND'}); });
+  app.post('/api/v1/companies/:companyId/departments', async (request,reply)=>{ const p=await adminPrincipal(request,reply); if(!p)return; const {companyId}=request.params as any; const v=await organizationRuntime.createDepartment(p,companyId,request.body??{}); return v?reply.code(201).send(v):reply.code(404).send({code:'COMPANY_NOT_FOUND'}); });
+  app.get('/api/v1/organizations/:organizationId/employees', async (request,reply)=>{ const p=await adminPrincipal(request,reply); if(!p)return; const {organizationId}=request.params as any; return {items:await organizationRuntime.listEmployees(p,organizationId)}; });
+  app.post('/api/v1/organizations/:organizationId/employees', async (request,reply)=>{ const p=await adminPrincipal(request,reply); if(!p)return; const {organizationId}=request.params as any; const v=await organizationRuntime.createEmployee(p,organizationId,request.body??{}); return v?reply.code(201).send(v):reply.code(404).send({code:'ORGANIZATION_NOT_FOUND'}); });
+  app.post('/api/v1/employees/:employeeId/employments', async (request,reply)=>{ const p=await adminPrincipal(request,reply); if(!p)return; const {employeeId}=request.params as any; const v=await organizationRuntime.startEmployment(p,employeeId,request.body??{}); return v?reply.code(201).send(v):reply.code(404).send({code:'EMPLOYEE_NOT_FOUND'}); });
+  app.get('/api/v1/organizations/:organizationId/groups', async (request,reply)=>{ const p=await adminPrincipal(request,reply); if(!p)return; const {organizationId}=request.params as any; return {items:await organizationRuntime.listGroups(p,organizationId)}; });
+  app.post('/api/v1/organizations/:organizationId/groups', async (request,reply)=>{ const p=await adminPrincipal(request,reply); if(!p)return; const {organizationId}=request.params as any; const v=await organizationRuntime.createGroup(p,organizationId,request.body??{}); return v?reply.code(201).send(v):reply.code(404).send({code:'ORGANIZATION_NOT_FOUND'}); });
+  app.post('/api/v1/groups/:groupId/members', async (request,reply)=>{ const p=await adminPrincipal(request,reply); if(!p)return; const {groupId}=request.params as any; const v=await organizationRuntime.addGroupMember(p,groupId,request.body??{}); return v?reply.code(201).send(v):reply.code(404).send({code:'GROUP_OR_EMPLOYEE_NOT_FOUND'}); });
 
   app.get('/readyz', async (_request, reply) => {
     const checks = {
