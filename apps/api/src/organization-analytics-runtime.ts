@@ -35,8 +35,8 @@ export function createOrganizationAnalyticsRuntime(database:DatabaseClient){
     if(!r.rowCount) throw new OrganizationAnalyticsError('TRAINING_VERSION_NOT_AVAILABLE');
   }
   function selectedCte(scopeType:AnalyticsScopeType,includeVersion:boolean){
-    const versionFilter=includeVersion?'and a.training_version_id=$3':'';
-    const scopeParam=includeVersion?'$4':'$3';
+    const versionFilter=includeVersion?'and a.training_version_id=$2':'';
+    const scopeParam=includeVersion?'$3':'$2';
     return `with selected as (
       select distinct a.id as assignment_id,a.learner_id,a.training_id,a.training_version_id
       from training_assignments a
@@ -56,9 +56,7 @@ export function createOrganizationAnalyticsRuntime(database:DatabaseClient){
       await assertScope(p,input.scopeType,input.scopeId);
       await assertVersion(p,input.trainingVersionId);
       const hasVersion=Boolean(input.trainingVersionId);
-      const params=hasVersion?[p.tenantId,input.scopeId,input.trainingVersionId,input.scopeId]:[p.tenantId,input.scopeId,input.scopeId];
-      // $2 is reserved for stable parameter positions in the aggregate queries.
-      const selectedParams=hasVersion?[p.tenantId,input.scopeId,input.trainingVersionId,input.scopeId]:[p.tenantId,input.scopeId,input.scopeId];
+      const selectedParams=hasVersion?[p.tenantId,input.trainingVersionId,input.scopeId]:[p.tenantId,input.scopeId];
       const cte=selectedCte(input.scopeType,hasVersion);
 
       const cohort=(await q(`${cte}
