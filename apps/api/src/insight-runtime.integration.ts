@@ -13,8 +13,8 @@ async function main(){
   const tenant=randomUUID(),learnerA=randomUUID(),learnerB=randomUUID(),unassigned=randomUUID();
   await db.pool.query('insert into tenants(id,name,slug) values($1,$2,$3)',[tenant,'M5 Tenant',`m5-${randomUUID()}`]);
   await seedUser(db.pool,learnerA,'Insight A');await seedUser(db.pool,learnerB,'Insight B');await seedUser(db.pool,unassigned,'Insight None');
-  const training=randomUUID(),version=randomUUID(),objective=randomUUID(),moduleId=randomUUID(),contentId=randomUUID();
-  const snapshot={title:'M5 Training',objectives:[{id:objective,tenantId:tenant,trainingId:training,statement:'Detect phishing',active:true}],modules:[{id:moduleId,tenantId:tenant,trainingId:training,title:'Phishing',position:1,active:true}],contents:[{id:contentId,tenantId:tenant,trainingId:training,moduleId,title:'Phishing refresher',type:'VIDEO',position:1,active:true,objectiveIds:[objective]}]};
+  const training=randomUUID(),version=randomUUID(),objective=randomUUID(),moduleId=randomUUID(),contentId=randomUUID(),unmappedContentId=randomUUID(),inactiveMappedContentId=randomUUID();
+  const snapshot={title:'M5 Training',objectives:[{id:objective,tenantId:tenant,trainingId:training,statement:'Detect phishing',active:true}],modules:[{id:moduleId,tenantId:tenant,trainingId:training,title:'Phishing',position:1,active:true}],contents:[{id:contentId,tenantId:tenant,trainingId:training,moduleId,title:'Phishing refresher',type:'VIDEO',position:1,active:true,objectiveIds:[objective]},{id:unmappedContentId,tenantId:tenant,trainingId:training,moduleId,title:'Unrelated content',type:'VIDEO',position:2,active:true,objectiveIds:[]},{id:inactiveMappedContentId,tenantId:tenant,trainingId:training,moduleId,title:'Retired mapped content',type:'VIDEO',position:3,active:false,objectiveIds:[objective]}]};
   await db.pool.query("insert into trainings(id,tenant_id,title,status) values($1,$2,'M5 Training','PUBLISHED')",[training,tenant]);
   await db.pool.query("insert into learning_objectives(id,tenant_id,training_id,statement,status) values($1,$2,$3,'Detect phishing','ACTIVE')",[objective,tenant,training]);
   await db.pool.query('insert into training_versions(id,tenant_id,training_id,version,snapshot,published_at) values($1,$2,$3,1,$4::jsonb,now())',[version,tenant,training,JSON.stringify(snapshot)]);
@@ -38,10 +38,11 @@ async function main(){
 
   const runtime=createInsightRuntime(db);
   const a=await runtime.getInsights({tenantId:tenant,userId:learnerA},version);
-  assert.equal(a.status,'BOUNDED_INSIGHT');assert.equal(a.insights.length,1);assert.equal(a.insights[0]!.sampleCount,3);assert.equal(a.insights[0]!.weak,true);assert.equal(a.recommendations.length,1);assert.equal(a.recommendations[0]!.contentId,contentId);
+  assert.equal(a.status,'BOUNDED_INSIGHT');assert.equal(a.insights.length,1);assert.equal(a.insights[0]!.sampleCount,3);assert.equal(a.insights[0]!.weak,true);assert.equal(a.recommendations.length,1);assert.equal(a.recommendations[0]!.contentId,contentId);assert.ok(!a.recommendations.some((r:any)=>r.contentId===unmappedContentId||r.contentId===inactiveMappedContentId));
   const b=await runtime.getInsights({tenantId:tenant,userId:learnerB},version);
   assert.equal(b.status,'INSUFFICIENT_EVIDENCE');assert.equal(b.insights.length,0);assert.equal(b.recommendations.length,0);
   await rejectCode(runtime.getInsights({tenantId:tenant,userId:unassigned},version),'TRAINING_NOT_AVAILABLE');
+  await rejectCode(runtime.getInsights({tenantId:randomUUID(),userId:learnerA},version),'TRAINING_NOT_AVAILABLE');
   console.log('Insight M5 PostgreSQL qualification PASS');
  }finally{await db.close();}
 }
