@@ -31,15 +31,22 @@ export function createAuthenticator(config: AppConfig, database: DatabaseClient)
       throw new AuthenticationError('TOKEN_INVALID');
     }
     if (typeof tenantClaim !== 'string' || !tenantClaim) throw new AuthenticationError('TENANT_MEMBERSHIP_REQUIRED');
-    const identity = await database.pool.query(
-      `select u.id as "userId", m.tenant_id as "tenantId"
-         from users u join memberships m on m.user_id=u.id
-        where u.external_subject=$1 and u.is_active=true and m.tenant_id=$2 and m.status='active'
+    const subjectResult = await database.pool.query(
+      `select id as "userId" from users
+        where external_subject=$1 and is_active=true
         limit 1`,
-      [subject, tenantClaim],
+      [subject],
     );
-    if (!identity.rowCount) throw new AuthenticationError('SUBJECT_NOT_ACTIVE');
-    const { userId, tenantId } = identity.rows[0];
+    if (!subjectResult.rowCount) throw new AuthenticationError('SUBJECT_NOT_ACTIVE');
+    const userId = subjectResult.rows[0].userId;
+    const membershipResult = await database.pool.query(
+      `select tenant_id as "tenantId" from memberships
+        where user_id=$1 and tenant_id=$2 and status='active'
+        limit 1`,
+      [userId, tenantClaim],
+    );
+    if (!membershipResult.rowCount) throw new AuthenticationError('TENANT_MEMBERSHIP_REQUIRED');
+    const tenantId = membershipResult.rows[0].tenantId;
     const grants = await database.pool.query(
       `select distinct r.code as "roleCode", rp.permission_code as "permissionCode"
          from memberships m
