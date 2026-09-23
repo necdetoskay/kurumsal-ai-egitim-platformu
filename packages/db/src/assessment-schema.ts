@@ -25,6 +25,7 @@ export const questionVersions = pgTable('question_versions', {
 export const assessments = pgTable('assessments', {
   id: uuid('id').defaultRandom().primaryKey(),
   tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+  title: text('title'),
   status: text('status').notNull().default('DRAFT'),
   passPercent: integer('pass_percent').notNull().default(60),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
