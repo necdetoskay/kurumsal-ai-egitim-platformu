@@ -10,6 +10,7 @@ import { createAssessmentRuntime, AssessmentRuntimeError } from './assessment-ru
 import { createInsightRuntime, InsightRuntimeError } from './insight-runtime.js';
 import { createOrganizationAnalyticsRuntime, OrganizationAnalyticsError, type AnalyticsScopeType } from './organization-analytics-runtime.js';
 import { createAudienceRuntime, AudienceRuntimeError, TrainingAudienceInvariantError } from './audience-runtime.js';
+import { createAssessmentAuthoringRuntime, AssessmentAuthoringRuntimeError } from './assessment-authoring-runtime.js';
 import { createTrainingRuntime, TrainingRuntimeError } from './training-runtime.js';
 
 export function buildApp(config: AppConfig) {
@@ -25,6 +26,7 @@ export function buildApp(config: AppConfig) {
   const insightRuntime = createInsightRuntime(database);
   const organizationAnalyticsRuntime = createOrganizationAnalyticsRuntime(database);
   const audienceRuntime = createAudienceRuntime(database);
+  const assessmentAuthoringRuntime = createAssessmentAuthoringRuntime(database);
   const trainingRuntime = createTrainingRuntime(database);
   const redis = new Redis(config.REDIS_URL, {
     lazyConnect: true,
@@ -128,6 +130,40 @@ export function buildApp(config: AppConfig) {
     const {trainingId}=request.params as {trainingId:string};
     const idempotencyKey=typeof request.headers['idempotency-key']==='string'?request.headers['idempotency-key']:'';
     try{return await trainingRuntime.publish(p,trainingId,idempotencyKey);}catch(error){return trainingError(reply,error);}
+  });
+
+  async function permissionPrincipal(request:any,reply:any,required:string[]) {
+    try {
+      const principal=await authenticate(request.headers.authorization);
+      if(!required.every(permission=>principal.permissions.includes(permission))) { reply.code(403).send({code:'INSUFFICIENT_PERMISSION'}); return null; }
+      return principal;
+    } catch(error) {
+      reply.code(401).send({code:error instanceof AuthenticationError?error.code:'TOKEN_INVALID'}); return null;
+    }
+  }
+  function assessmentAuthoringError(reply:any,error:unknown){
+    if(error instanceof AssessmentAuthoringRuntimeError){
+      const status=error.code==='TRAINING_VERSION_NOT_AVAILABLE'||error.code==='QUESTION_VERSION_NOT_APPROVED'||error.code==='OBJECTIVE_NOT_AVAILABLE'?404:error.code==='IDEMPOTENCY_CONFLICT'?409:422;
+      return reply.code(status).send({code:error.code});
+    }
+    throw error;
+  }
+  app.get('/api/v1/question-versions/approved',async(request,reply)=>{
+    const p=await permissionPrincipal(request,reply,['question.read']);if(!p)return;
+    return {items:await assessmentAuthoringRuntime.listApprovedQuestions(p)};
+  });
+  app.get('/api/v1/trainings/:trainingId/versions/:trainingVersionId/assessments',async(request,reply)=>{
+    const p=await permissionPrincipal(request,reply,['assessment.read']);if(!p)return;
+    const {trainingId,trainingVersionId}=request.params as {trainingId:string;trainingVersionId:string};
+    try{return {items:await assessmentAuthoringRuntime.listAssessments(p,trainingId,trainingVersionId)};}catch(error){return assessmentAuthoringError(reply,error);}
+  });
+  app.post('/api/v1/trainings/:trainingId/versions/:trainingVersionId/assessments',async(request,reply)=>{
+    const p=await permissionPrincipal(request,reply,['assessment.publish','question.read']);if(!p)return;
+    const {trainingId,trainingVersionId}=request.params as {trainingId:string;trainingVersionId:string};
+    const b=(request.body??{}) as any;if('tenantId' in b)return reply.code(400).send({code:'CLIENT_TENANT_OVERRIDE_FORBIDDEN'});
+    const idempotencyKey=typeof request.headers['idempotency-key']==='string'?request.headers['idempotency-key']:'';
+    try{return reply.code(201).send(await assessmentAuthoringRuntime.publishAssessment(p,{trainingId,trainingVersionId,passPercent:b.passPercent,questions:Array.isArray(b.questions)?b.questions:[],idempotencyKey}));}
+    catch(error){return assessmentAuthoringError(reply,error);}
   });
 
   async function learnerPrincipal(request:any, reply:any) {
