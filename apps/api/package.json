@@ -20,7 +20,8 @@
     "@kaep/learning": "workspace:*",
     "@kaep/organization-management-api": "workspace:*",
     "fastify": "^5.0.0",
-    "ioredis": "^5.0.0"
+    "ioredis": "^5.0.0",
+    "jose": "^6.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
