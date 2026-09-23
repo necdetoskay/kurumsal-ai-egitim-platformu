@@ -47,14 +47,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      # M8 bootstrap: capture the generated lockfile once, then commit it and switch this gate to --frozen-lockfile.
-      - run: pnpm install --no-frozen-lockfile
-      - name: Capture generated lockfile
-        uses: actions/upload-artifact@v4
-        with:
-          name: m8-generated-lockfile
-          path: pnpm-lock.yaml
-          if-no-files-found: error
+      - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
