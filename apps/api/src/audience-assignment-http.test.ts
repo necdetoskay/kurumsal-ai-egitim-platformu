@@ -23,6 +23,9 @@ const config: AppConfig = {
   DATABASE_URL: 'postgresql://kaep:kaep@127.0.0.1:5432/kaep',
   REDIS_URL: 'redis://127.0.0.1:6379',
   LOG_LEVEL: 'silent',
+  AUTH_JWKS_URL: 'https://auth.invalid/.well-known/jwks.json',
+  AUTH_ISSUER: 'https://auth.invalid/',
+  AUTH_AUDIENCE: 'kaep-api',
 };
 
 const apps: ReturnType<typeof buildApp>[] = [];
