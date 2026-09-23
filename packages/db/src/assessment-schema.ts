@@ -1,7 +1,7 @@
 import { boolean, foreignKey, index, integer, jsonb, pgTable, text, timestamp, unique, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { tenants, users } from './schema.js';
-import { trainingVersions } from './training-schema.js';
+import { learningObjectives, trainingVersions } from './training-schema.js';
 
 export const questions = pgTable('questions', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -60,12 +60,13 @@ export const assessmentQuestionSnapshots = pgTable('assessment_question_snapshot
   assessmentId: uuid('assessment_id').notNull(),
   questionId: uuid('question_id').notNull(),
   questionVersionId: uuid('question_version_id').notNull(),
+  objectiveId: uuid('objective_id'),
   position: integer('position').notNull(),
   prompt: text('prompt').notNull(),
   optionsJson: jsonb('options_json').notNull(),
   correctOptionIndex: integer('correct_option_index').notNull(),
   points: integer('points').notNull().default(1),
-}, (table) => ({ assessmentFk: foreignKey({ name: 'assessment_snapshots_tenant_assessment_fk', columns: [table.tenantId, table.assessmentId], foreignColumns: [assessments.tenantId, assessments.id] }).onDelete('restrict'), questionFk: foreignKey({ name: 'assessment_snapshots_tenant_question_fk', columns: [table.tenantId, table.questionId], foreignColumns: [questions.tenantId, questions.id] }).onDelete('restrict'), questionVersionFk: foreignKey({ name: 'assessment_snapshots_tenant_question_version_fk', columns: [table.tenantId, table.questionVersionId], foreignColumns: [questionVersions.tenantId, questionVersions.id] }).onDelete('restrict'), assessmentPositionUq: uniqueIndex('assessment_question_snapshots_tenant_position_uq').on(table.tenantId, table.assessmentId, table.position) }));
+}, (table) => ({ assessmentFk: foreignKey({ name: 'assessment_snapshots_tenant_assessment_fk', columns: [table.tenantId, table.assessmentId], foreignColumns: [assessments.tenantId, assessments.id] }).onDelete('restrict'), questionFk: foreignKey({ name: 'assessment_snapshots_tenant_question_fk', columns: [table.tenantId, table.questionId], foreignColumns: [questions.tenantId, questions.id] }).onDelete('restrict'), questionVersionFk: foreignKey({ name: 'assessment_snapshots_tenant_question_version_fk', columns: [table.tenantId, table.questionVersionId], foreignColumns: [questionVersions.tenantId, questionVersions.id] }).onDelete('restrict'), objectiveFk: foreignKey({ name: 'assessment_snapshots_tenant_objective_fk', columns: [table.tenantId, table.objectiveId], foreignColumns: [learningObjectives.tenantId, learningObjectives.id] }).onDelete('restrict'), assessmentPositionUq: uniqueIndex('assessment_question_snapshots_tenant_position_uq').on(table.tenantId, table.assessmentId, table.position) }));
 
 export const attempts = pgTable('attempts', {
   id: uuid('id').defaultRandom().primaryKey(),
