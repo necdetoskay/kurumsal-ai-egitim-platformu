@@ -15,7 +15,7 @@ import {
   varchar,
 } from 'drizzle-orm/pg-core';
 
-import { roles, tenants, users } from './schema.js';
+import { memberships, roles, tenants, users } from './schema.js';
 import { employees } from './employee-schema.js';
 import { companies, departments, organizations } from './organization-schema.js';
 
@@ -160,6 +160,41 @@ export const employeeExternalIdentities = pgTable(
       table.employeeId,
       table.provider,
     ),
+  }),
+);
+
+export const employeeUserLinks = pgTable(
+  'employee_user_links',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'restrict' }),
+    employeeId: uuid('employee_id').notNull(),
+    userId: uuid('user_id').notNull(),
+    validFrom: timestamp('valid_from', { withTimezone: true }).defaultNow().notNull(),
+    validUntil: timestamp('valid_until', { withTimezone: true }),
+    createdByUserId: uuid('created_by_user_id').references(() => users.id, { onDelete: 'restrict' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    employeeScopeFk: foreignKey({
+      name: 'employee_user_links_tenant_employee_fk',
+      columns: [table.tenantId, table.employeeId],
+      foreignColumns: [employees.tenantId, employees.id],
+    }).onDelete('restrict'),
+    membershipScopeFk: foreignKey({
+      name: 'employee_user_links_tenant_user_membership_fk',
+      columns: [table.tenantId, table.userId],
+      foreignColumns: [memberships.tenantId, memberships.userId],
+    }).onDelete('restrict'),
+    validRangeCk: check('employee_user_links_valid_range_ck', sql`${table.validUntil} is null or ${table.validUntil} >= ${table.validFrom}`),
+    activeEmployeeUq: uniqueIndex('employee_user_links_active_employee_uq')
+      .on(table.tenantId, table.employeeId)
+      .where(sql`${table.validUntil} is null`),
+    activeUserUq: uniqueIndex('employee_user_links_active_user_uq')
+      .on(table.tenantId, table.userId)
+      .where(sql`${table.validUntil} is null`),
+    employeeHistoryIdx: index('employee_user_links_employee_history_idx').on(table.tenantId, table.employeeId, table.validFrom),
+    userHistoryIdx: index('employee_user_links_user_history_idx').on(table.tenantId, table.userId, table.validFrom),
   }),
 );
 
