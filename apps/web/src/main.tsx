@@ -7,7 +7,7 @@ import { QuestionAssessmentWorkspace } from './assessment-ui';
 import { OrganizationRuntimeView } from './organization-runtime-view';
 import { PersonnelRuntimeView } from './personnel-runtime-view';
 import { GroupRuntimeView } from './group-runtime-view';
-import { OperationsAdminView } from './operations-admin-ui';
+
 import { navForRole, type WebRole } from './navigation';
 import { defaultScreenFor, screenFor, type ScreenDefinition } from './screens';
 import './styles.css';
@@ -23,7 +23,7 @@ function WorkflowScreen({ screen, role }: { screen: ScreenDefinition; role: WebR
   if (role === 'tenant_admin' && screen.href === '/admin/organization') return <OrganizationRuntimeView />;
   if (role === 'tenant_admin' && screen.href === '/admin/organization/personnel') return <PersonnelRuntimeView />;
   if (role === 'tenant_admin' && screen.href === '/admin/organization/directory') return <GroupRuntimeView />;
-  if (role === 'tenant_admin' && screen.href === '/admin/organization/operations') return <OperationsAdminView state="ready" imports={[{ id: 'imp1', fileName: 'personel-2026-09.csv', status: 'REVIEW', rows: 128, warnings: 3 }]} integrations={[{ id: 'ad1', name: 'Kurumsal AD', type: 'AD_LDAP', status: 'CONNECTED', lastSyncAt: '2026-09-05 20:00' }, { id: 'erp1', name: 'İK ERP', type: 'HR_ERP', status: 'DEGRADED', error: 'Son senkron kısmi tamamlandı.' }]} audit={[{ id: 'a1', actor: 'admin@example.test', action: 'EMPLOYMENT_TRANSFER', occurredAt: '2026-09-05 19:42', entity: 'employee:e1', correlationId: 'corr-001' }]} audience={[{ type: 'DEPARTMENT', id: 'd1', label: 'Bilgi Teknolojileri', resolvedLearners: 18 }, { type: 'GROUP', id: 'g1', label: 'BT Ekibi', resolvedLearners: 12 }]} uniqueLearnerCount={22} overlapCount={8} />;
+  if (role === 'tenant_admin' && screen.href === '/admin/organization/operations') return <StatePanel state="empty" />;
   const learner = role === 'learner';
   return <><header className="page-header"><div><span className="eyebrow">Ekran #{screen.id} · {roleLabels[role]}</span><h1>{screen.title}</h1><p>{screen.description}</p></div><span className="status-badge">{learner ? 'Sunucu yetkili' : 'Rol kapsamı'}</span></header><section className="content-card" aria-labelledby="workflow-state-title"><h2 id="workflow-state-title">Desteklenen durumlar</h2><div className="chip-row">{screen.workflowStates.map((state) => <span className="state-chip" key={state}>{state}</span>)}</div></section>{learner && <section className="content-card safety-card"><h2>Learner güvenlik sınırı</h2><p>Navigation yalnız sunum katmanıdır. Yetkilendirme sunucu tarafında yapılır; assessment answer key ve scoring secret istemci projection’ına dahil edilmez.</p></section>}</>;
 }
