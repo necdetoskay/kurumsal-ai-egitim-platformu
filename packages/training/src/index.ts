@@ -28,6 +28,7 @@ export interface TrainingContentItem {
   position: number;
   active: boolean;
   durationSeconds?: number;
+  objectiveIds?: readonly string[];
 }
 
 export interface TrainingSnapshot {
@@ -92,7 +93,7 @@ export function validateTrainingOwnership(state: TrainingAggregateState): void {
     }
   }
   for (const content of state.contents ?? []) {
-    if (content.tenantId !== state.tenantId || content.trainingId !== state.id || !state.modules.some((module) => module.id === content.moduleId)) {
+    if (content.tenantId !== state.tenantId || content.trainingId !== state.id || !state.modules.some((module) => module.id === content.moduleId) || (content.objectiveIds ?? []).some((id) => !state.objectives.some((objective) => objective.id === id))) {
       throw new TrainingDomainError('TENANT_BOUNDARY_VIOLATION');
     }
   }
