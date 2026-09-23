@@ -1,7 +1,7 @@
 # DESIGN FREEZE — V1
 
 **Status:** ACTIVE BASELINE — LIMITED REOPEN UNDER AEGIS MUR #105  
-**Version:** 1.1-review  
+**Version:** 1.2-mur-reconciled  
 **Release baseline:** `main`  
 **Canonical implementation order:** `docs/10-sprints/BACKEND_FIRST_SPRINT_ROADMAP_V1.md`
 
@@ -9,14 +9,7 @@
 
 AEGIS MUR #105 does **not** discard the V1 design foundation. The core technical and safety invariants below remain frozen.
 
-MUR temporarily reopens only the following governance/product-alignment questions:
-
-1. reconcile the default `main` baseline with `design/organization-management-canonical-v1`,
-2. constrain future Organization Management expansion to the learning-product purpose,
-3. complete the learner mission flow,
-4. complete Learning Objective evidence -> bounded Learning Insight -> recommendation/repeat,
-5. add mission-level E2E qualification before V1 release,
-6. remove ambiguity from historical roadmap/doc entry points.
+M0 canonical reconciliation is complete: Organization canonical V1 and the M1 learning bridge are on `main`. MUR remains open only to close verified mission/runtime debt and complete the learner mission.
 
 `main` remains the single V1 release baseline. Work on `design/organization-management-canonical-v1` is an integration source and is not considered part of the release baseline until promoted to `main` through reviewed qualification.
 
@@ -129,4 +122,4 @@ New V1 feature expansion is frozen during MUR recovery unless it:
 2. closes a CRITICAL/HIGH MUR finding, or
 3. is required for security, data integrity or release safety.
 
-The next baseline work is canonical reconciliation and qualified promotion of already-completed Organization work, followed by learner and Learning Insight mission completion.
+Canonical reconciliation/promotion is complete. The next baseline work is M1 production runtime composition and real Organization -> Learning qualification, followed by learner and Learning Insight mission completion.
