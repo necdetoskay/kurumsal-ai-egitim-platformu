@@ -166,7 +166,7 @@ test.describe.serial('AEGIS MUR M7 browser mission',()=>{
 
    const published=await json<any>(await request.get(`/api/v1/trainings/${mission.trainingId}`,{headers:instructorAuth}));
    const illegal=await request.patch(`/api/v1/trainings/${mission.trainingId}`,{headers:{...instructorAuth,'content-type':'application/json'},data:{
-     title:'MUTATION MUST FAIL',revision:published.revision,objectives:[{id:mission.objectiveId,statement:'mutated'}],modules:[{title:'mutated',contents:[]}],
+     title:'MUTATION MUST FAIL',revision:published.revision,objectives:[{id:mission.objectiveId,statement:'mutated'}],modules:[{title:'mutated',contents:[{title:'mutated content',type:'TEXT',objectiveIds:[mission.objectiveId]}]}],
    }});
    expect(illegal.status()).toBe(409);
 
