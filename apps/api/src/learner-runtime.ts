@@ -60,7 +60,7 @@ export function createLearnerRuntime(database:DatabaseClient){
    return written.rows[0];
   },
   async resume(p:LearnerPrincipal,trainingVersionId:string){
-   const assignment=await q(`select id from training_assignments where tenant_id=$1 and learner_id=$2 and training_version_id=$3 and status='ACTIVE' order by assigned_at desc limit 1`,[p.tenantId,p.userId,trainingVersionId]);
+   const assignment=await q(`select id from training_assignments where tenant_id=$1 and learner_id=$2 and training_version_id=$3 and status in ('ACTIVE','COMPLETED') order by assigned_at desc limit 1`,[p.tenantId,p.userId,trainingVersionId]);
    if(!assignment.rowCount) throw new LearnerRuntimeError('ASSIGNMENT_NOT_AVAILABLE');
    const progress=await q(`select kind,source_id as "sourceId",progress_permille as "progressPermille",position_seconds as "positionSeconds",completed,updated_at as "updatedAt"
       from learning_progress where tenant_id=$1 and learner_id=$2 and training_version_id=$3 and assignment_id=$4 order by updated_at desc`,

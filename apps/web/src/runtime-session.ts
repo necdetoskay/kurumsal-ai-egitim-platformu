@@ -15,7 +15,8 @@ export function bearerHttp(){
   const request=async<T>(path:string,init:RequestInit={})=>{
     const token=sessionStorage.getItem('kaep.access_token');
     if(!token) throw new Error('SESSION_REQUIRED');
-    const response=await fetch(path,{...init,headers:{'content-type':'application/json',authorization:`Bearer ${token}`,...(init.headers??{})}});
+    const hasBody=init.body!==undefined&&init.body!==null;
+    const response=await fetch(path,{...init,headers:{...(hasBody?{'content-type':'application/json'}:{}),authorization:`Bearer ${token}`,...(init.headers??{})}});
     if(response.status===401) throw new Error('SESSION_EXPIRED');
     if(response.status===403) throw new Error('FORBIDDEN');
     if(!response.ok) throw new Error(`HTTP_${response.status}`);
