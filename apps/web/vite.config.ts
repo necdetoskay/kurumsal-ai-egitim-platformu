@@ -5,5 +5,5 @@ const apiTarget=process.env.KAEP_API_TARGET;
 
 export default defineConfig({
   plugins: [react()],
-  ...(apiTarget ? { server: { proxy: { '/api': { target: apiTarget, changeOrigin: true } } } } : {}),
+  ...(apiTarget ? { server: { proxy: { '/api': { target: apiTarget, changeOrigin: true } } }, preview: { proxy: { '/api': { target: apiTarget, changeOrigin: true } } } } : {}),
 });
