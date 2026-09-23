@@ -8,7 +8,7 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "test:db": "tsx src/audience-assignment-persistence.integration.ts && tsx src/organization-runtime.integration.ts"
+    "test:db": "tsx src/audience-assignment-persistence.integration.ts && tsx src/organization-runtime.integration.ts && tsx src/learner-runtime.integration.ts"
   },
   "dependencies": {
     "@kaep/assessment": "workspace:*",

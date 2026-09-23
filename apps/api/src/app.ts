@@ -5,6 +5,7 @@ import type { AppConfig } from '@kaep/config';
 import { persistConfirmedAudienceAssignments, AudienceAssignmentPersistenceError } from './audience-assignment-persistence.js';
 import { createAuthenticator, AuthenticationError } from './authentication.js';
 import { createOrganizationRuntime } from './organization-runtime.js';
+import { createLearnerRuntime, LearnerRuntimeError, type ProgressKind } from './learner-runtime.js';
 
 export function buildApp(config: AppConfig) {
   const app = Fastify({
@@ -14,6 +15,7 @@ export function buildApp(config: AppConfig) {
   const database = createDatabase(config.DATABASE_URL);
   const authenticate = createAuthenticator(config, database);
   const organizationRuntime = createOrganizationRuntime(database);
+  const learnerRuntime = createLearnerRuntime(database);
   const redis = new Redis(config.REDIS_URL, {
     lazyConnect: true,
     maxRetriesPerRequest: 1,
@@ -64,95 +66,65 @@ export function buildApp(config: AppConfig) {
     }
   });
 
-  app.get('/api/v1/learner/assignments', async (request, reply) => {
-    let principal;
-    try { principal = await authenticate(request.headers.authorization); }
-    catch (error) { return reply.code(401).send({ code: error instanceof AuthenticationError ? error.code : 'TOKEN_INVALID' }); }
-    if (!principal.roleCodes.includes('learner')) return reply.code(403).send({ code: 'INSUFFICIENT_ROLE' });
-    const result = await database.pool.query(
-      `select a.id, a.training_id as "trainingId", a.training_version_id as "trainingVersionId",
-              a.status, a.assigned_at as "assignedAt", a.completed_at as "completedAt",
-              t.title, t.description
-         from training_assignments a
-         join trainings t on t.id = a.training_id and t.tenant_id = a.tenant_id
-        where a.tenant_id = $1 and a.learner_id = $2
-        order by a.assigned_at desc`,
-      [principal.tenantId, principal.userId],
-    );
-    return { items: result.rows };
+  async function learnerPrincipal(request:any, reply:any) {
+    try {
+      const principal=await authenticate(request.headers.authorization);
+      if (!principal.roleCodes.includes('learner')) { reply.code(403).send({code:'INSUFFICIENT_ROLE'}); return null; }
+      return principal;
+    } catch (error) {
+      reply.code(401).send({code:error instanceof AuthenticationError ? error.code : 'TOKEN_INVALID'}); return null;
+    }
+  }
+  function learnerError(reply:any,error:unknown) {
+    if(error instanceof LearnerRuntimeError){
+      const status=error.code==='INVALID_PROGRESS'?400:404;
+      return reply.code(status).send({code:error.code});
+    }
+    throw error;
+  }
+
+  app.get('/api/v1/learner/assignments', async (request,reply)=>{
+    const p=await learnerPrincipal(request,reply); if(!p)return;
+    return {items:await learnerRuntime.listAssignments(p)};
   });
 
-  app.get('/api/v1/learner/trainings/:trainingId', async (request, reply) => {
-    let principal;
-    try { principal = await authenticate(request.headers.authorization); }
-    catch (error) { return reply.code(401).send({ code: error instanceof AuthenticationError ? error.code : 'TOKEN_INVALID' }); }
-    if (!principal.roleCodes.includes('learner')) return reply.code(403).send({ code: 'INSUFFICIENT_ROLE' });
-    const { trainingId } = request.params as { trainingId: string };
-    const result = await database.pool.query(
-      `select a.id as "assignmentId", a.training_id as "trainingId",
-              a.training_version_id as "trainingVersionId", a.status,
-              t.title, t.description, v.version, v.snapshot
-         from training_assignments a
-         join trainings t on t.id = a.training_id and t.tenant_id = a.tenant_id
-         join training_versions v on v.id = a.training_version_id and v.training_id = a.training_id and v.tenant_id = a.tenant_id
-        where a.tenant_id = $1 and a.learner_id = $2 and a.training_id = $3
-        order by a.assigned_at desc limit 1`,
-      [principal.tenantId, principal.userId, trainingId],
-    );
-    if (!result.rowCount) return reply.code(404).send({ code: 'TRAINING_NOT_ASSIGNED' });
-    return result.rows[0];
+  app.get('/api/v1/learner/trainings/:trainingId', async (request,reply)=>{
+    const p=await learnerPrincipal(request,reply); if(!p)return;
+    const {trainingId}=request.params as {trainingId:string};
+    const result=await learnerRuntime.getTraining(p,trainingId);
+    return result??reply.code(404).send({code:'TRAINING_NOT_ASSIGNED'});
   });
 
-  app.put('/api/v1/learner/progress/:trainingVersionId', async (request, reply) => {
-    let principal;
-    try { principal = await authenticate(request.headers.authorization); }
-    catch (error) { return reply.code(401).send({ code: error instanceof AuthenticationError ? error.code : 'TOKEN_INVALID' }); }
-    if (!principal.roleCodes.includes('learner')) return reply.code(403).send({ code: 'INSUFFICIENT_ROLE' });
-    const { trainingVersionId } = request.params as { trainingVersionId: string };
-    const body = (request.body ?? {}) as { assignmentId?: string; sourceId?: string; completed?: boolean; tenantId?: string; learnerId?: string };
-    if ('tenantId' in body || 'learnerId' in body) return reply.code(400).send({ code: 'CLIENT_IDENTITY_OVERRIDE_FORBIDDEN' });
-    if (!body.assignmentId || !body.sourceId) return reply.code(400).send({ code: 'INVALID_REQUEST' });
-
-    const assignment = await database.pool.query(
-      `select id, training_id from training_assignments
-        where id = $1 and tenant_id = $2 and learner_id = $3 and training_version_id = $4 and status = 'ACTIVE'`,
-      [body.assignmentId, principal.tenantId, principal.userId, trainingVersionId],
-    );
-    if (!assignment.rowCount) return reply.code(404).send({ code: 'ASSIGNMENT_NOT_AVAILABLE' });
-
-    const payload = JSON.stringify({ completed: body.completed === true });
-    const written = await database.pool.query(
-      `insert into learning_evidence
-        (tenant_id, assignment_id, learner_id, training_id, training_version_id, type, source_id, payload, occurred_at)
-       values ($1,$2,$3,$4,$5,'MODULE_COMPLETED',$6,$7::jsonb,now())
-       on conflict (tenant_id, assignment_id, type, source_id) do nothing
-       returning id, occurred_at as "occurredAt"`,
-      [principal.tenantId, body.assignmentId, principal.userId, assignment.rows[0].training_id, trainingVersionId, body.sourceId, payload],
-    );
-    if (written.rowCount) return reply.code(201).send({ replayed: false, evidence: written.rows[0] });
-    const existing = await database.pool.query(
-      `select id, occurred_at as "occurredAt", payload from learning_evidence
-        where tenant_id=$1 and assignment_id=$2 and type='MODULE_COMPLETED' and source_id=$3`,
-      [principal.tenantId, body.assignmentId, body.sourceId],
-    );
-    return reply.code(200).send({ replayed: true, evidence: existing.rows[0] });
+  app.put('/api/v1/learner/progress/:trainingVersionId', async (request,reply)=>{
+    const p=await learnerPrincipal(request,reply); if(!p)return;
+    const {trainingVersionId}=request.params as {trainingVersionId:string};
+    const b=(request.body??{}) as any;
+    if('tenantId' in b||'learnerId' in b)return reply.code(400).send({code:'CLIENT_IDENTITY_OVERRIDE_FORBIDDEN'});
+    if(!b.assignmentId||!b.sourceId)return reply.code(400).send({code:'INVALID_REQUEST'});
+    const kind=(b.kind??'MODULE') as ProgressKind;
+    const progressPermille=b.progressPermille??(b.completed===true?1000:0);
+    try { return await learnerRuntime.putProgress(p,{assignmentId:b.assignmentId,trainingVersionId,kind,sourceId:b.sourceId,progressPermille,positionSeconds:b.positionSeconds,completed:b.completed}); }
+    catch(error){ return learnerError(reply,error); }
   });
 
-  app.get('/api/v1/learner/trainings/:trainingVersionId/resume', async (request, reply) => {
-    let principal;
-    try { principal = await authenticate(request.headers.authorization); }
-    catch (error) { return reply.code(401).send({ code: error instanceof AuthenticationError ? error.code : 'TOKEN_INVALID' }); }
-    if (!principal.roleCodes.includes('learner')) return reply.code(403).send({ code: 'INSUFFICIENT_ROLE' });
-    const { trainingVersionId } = request.params as { trainingVersionId: string };
-    const result = await database.pool.query(
-      `select e.source_id as "sourceId", e.payload, e.occurred_at as "occurredAt"
-         from learning_evidence e
-         join training_assignments a on a.id=e.assignment_id and a.tenant_id=e.tenant_id
-        where e.tenant_id=$1 and e.learner_id=$2 and e.training_version_id=$3
-        order by e.occurred_at desc`,
-      [principal.tenantId, principal.userId, trainingVersionId],
-    );
-    return { trainingVersionId, progress: result.rows };
+  async function itemProgress(request:any,reply:any,kind:ProgressKind,paramName:string){
+    const p=await learnerPrincipal(request,reply); if(!p)return;
+    const b=request.body??{};
+    if('tenantId' in b||'learnerId' in b)return reply.code(400).send({code:'CLIENT_IDENTITY_OVERRIDE_FORBIDDEN'});
+    if(!b.assignmentId||!b.trainingVersionId)return reply.code(400).send({code:'INVALID_REQUEST'});
+    const sourceId=request.params[paramName];
+    try { return await learnerRuntime.putProgress(p,{assignmentId:b.assignmentId,trainingVersionId:b.trainingVersionId,kind,sourceId,progressPermille:b.progressPermille??(b.completed===true?1000:0),positionSeconds:b.positionSeconds,completed:b.completed}); }
+    catch(error){ return learnerError(reply,error); }
+  }
+  app.put('/api/v1/learner/modules/:moduleId/progress',(request,reply)=>itemProgress(request,reply,'MODULE','moduleId'));
+  app.put('/api/v1/learner/contents/:contentId/progress',(request,reply)=>itemProgress(request,reply,'CONTENT','contentId'));
+  app.put('/api/v1/learner/videos/:videoId/progress',(request,reply)=>itemProgress(request,reply,'VIDEO','videoId'));
+
+  app.get('/api/v1/learner/trainings/:trainingVersionId/resume', async (request,reply)=>{
+    const p=await learnerPrincipal(request,reply); if(!p)return;
+    const {trainingVersionId}=request.params as {trainingVersionId:string};
+    try { return await learnerRuntime.resume(p,trainingVersionId); }
+    catch(error){ return learnerError(reply,error); }
   });
 
   async function adminPrincipal(request:any, reply:any) {

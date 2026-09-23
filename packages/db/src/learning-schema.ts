@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { check, foreignKey, index, jsonb, pgEnum, pgTable, text, timestamp, unique, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { boolean, check, foreignKey, index, integer, jsonb, pgEnum, pgTable, text, timestamp, unique, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 import { tenants, users } from './schema.js';
 import { trainingVersions, trainings } from './training-schema.js';
 
@@ -72,6 +72,38 @@ export const learningEvidence = pgTable('learning_evidence', {
 }, (table) => ({
   sourceUnique: uniqueIndex('learning_evidence_source_uq').on(table.tenantId, table.assignmentId, table.type, table.sourceId),
   assignmentOccurredIdx: index('learning_evidence_assignment_occurred_idx').on(table.tenantId, table.assignmentId, table.occurredAt),
+}));
+
+export const learningProgressKind = pgEnum('learning_progress_kind', ['TRAINING', 'MODULE', 'CONTENT', 'VIDEO']);
+
+export const learningProgress = pgTable('learning_progress', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'restrict' }),
+  assignmentId: uuid('assignment_id').notNull(),
+  learnerId: uuid('learner_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  trainingId: uuid('training_id').notNull(),
+  trainingVersionId: uuid('training_version_id').notNull(),
+  kind: learningProgressKind('kind').notNull(),
+  sourceId: text('source_id').notNull(),
+  progressPermille: integer('progress_permille').notNull().default(0),
+  positionSeconds: integer('position_seconds'),
+  completed: boolean('completed').notNull().default(false),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  assignmentScopeFk: foreignKey({
+    name: 'learning_progress_tenant_assignment_fk',
+    columns: [table.tenantId, table.assignmentId],
+    foreignColumns: [trainingAssignments.tenantId, trainingAssignments.id],
+  }).onDelete('restrict'),
+  trainingVersionScopeFk: foreignKey({
+    name: 'learning_progress_tenant_training_version_fk',
+    columns: [table.tenantId, table.trainingId, table.trainingVersionId],
+    foreignColumns: [trainingVersions.tenantId, trainingVersions.trainingId, trainingVersions.id],
+  }).onDelete('restrict'),
+  sourceUnique: uniqueIndex('learning_progress_source_uq').on(table.tenantId, table.assignmentId, table.kind, table.sourceId),
+  progressRange: check('learning_progress_permille_ck', sql`${table.progressPermille} between 0 and 1000`),
+  positionRange: check('learning_progress_position_ck', sql`${table.positionSeconds} is null or ${table.positionSeconds} >= 0`),
+  learnerVersionIdx: index('learning_progress_learner_version_idx').on(table.tenantId, table.learnerId, table.trainingVersionId, table.updatedAt),
 }));
 
 export const trainingCompletions = pgTable('training_completions', {
