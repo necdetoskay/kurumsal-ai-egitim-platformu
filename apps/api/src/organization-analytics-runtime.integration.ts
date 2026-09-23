@@ -57,7 +57,7 @@ async function main(){
   assert.equal(aggregate.privacy.suppressed,false);assert.equal(aggregate.privacy.cohortSize,MIN_ANALYTICS_COHORT);
   assert.equal(aggregate.assignmentSummary?.assigned,5);assert.equal(aggregate.assignmentSummary?.completed,3);assert.equal(aggregate.assignmentSummary?.completionRatePercent,60);
   assert.equal(aggregate.objectiveSignals.length,1);assert.equal(aggregate.objectiveSignals[0]?.qualifiedLearners,5);assert.equal(aggregate.objectiveSignals[0]?.weakLearners,4);
-  assert.equal(aggregate.questionSignals.length,3);assert.equal(aggregate.unmappedAudienceAssignments,1);
+  assert.equal(aggregate.questionSignals.length,3);assert.equal(aggregate.tenantUnmappedAudienceAssignments,1);
 
   const small=await runtime.getAggregate({tenantId:tenant,userId:randomUUID()},{scopeType:'GROUP',scopeId:group,trainingVersionId:version});
   assert.equal(small.privacy.suppressed,true);assert.equal(small.privacy.cohortSize,null);assert.equal(small.assignmentSummary,null);assert.deepEqual(small.objectiveSignals,[]);
