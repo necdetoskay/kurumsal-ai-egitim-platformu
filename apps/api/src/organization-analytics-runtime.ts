@@ -80,7 +80,7 @@ export function createOrganizationAnalyticsRuntime(database:DatabaseClient){
           trainingVersionId:input.trainingVersionId??null,
           privacy:{minimumCohort:MIN_ANALYTICS_COHORT,suppressed:true,cohortSize:null},
           assignmentSummary:null,objectiveSignals:[],questionSignals:[],
-          unmappedAudienceAssignments:Number(unmapped),
+          tenantUnmappedAudienceAssignments:Number(unmapped),
         };
       }
 
@@ -126,7 +126,7 @@ export function createOrganizationAnalyticsRuntime(database:DatabaseClient){
         trainingVersionId:input.trainingVersionId??null,
         privacy:{minimumCohort:MIN_ANALYTICS_COHORT,suppressed:false,cohortSize:actualCohort},
         assignmentSummary,objectiveSignals,questionSignals,
-        unmappedAudienceAssignments:Number(unmapped),
+        tenantUnmappedAudienceAssignments:Number(unmapped),
       };
     },
   };
