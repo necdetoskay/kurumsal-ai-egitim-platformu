@@ -1,6 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AppConfig } from '@kaep/config';
 
+vi.mock('./authentication.js', () => ({
+  AuthenticationError: class AuthenticationError extends Error {},
+  createAuthenticator: () => async (authorization: string | undefined) => {
+    if (!authorization?.startsWith('Bearer ')) throw new Error('TOKEN_REQUIRED');
+    return { tenantId: 'tenant-a', userId: 'admin-a', roleCodes: ['tenant_admin'], permissions: [] };
+  },
+}));
+
 vi.mock('./audience-assignment-persistence.js', async () => {
   class AudienceAssignmentPersistenceError extends Error {
     constructor(public readonly code: string) { super(code); }
@@ -47,7 +55,7 @@ describe('M1 audience assignment HTTP boundary', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/api/v1/training-audiences/r1/assignments',
-      headers: { 'x-kaep-tenant-id': 'tenant-a', 'x-kaep-user-id': 'admin-a', 'x-kaep-role': 'tenant_admin' },
+      headers: { authorization: 'Bearer test-token' },
       payload: { tenantId: 'tenant-b', trainingId: 't1', trainingVersionId: 'v1', resolutionFingerprint: 'a'.repeat(64), idempotencyKey: 'k1' },
     });
     expect(response.statusCode).toBe(400);
@@ -59,7 +67,7 @@ describe('M1 audience assignment HTTP boundary', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/api/v1/training-audiences/r1/assignments',
-      headers: { 'x-kaep-tenant-id': 'tenant-a', 'x-kaep-user-id': 'admin-a', 'x-kaep-role': 'tenant_admin' },
+      headers: { authorization: 'Bearer test-token' },
       payload: { trainingId: 't1', trainingVersionId: 'v1', resolutionFingerprint: 'a'.repeat(64), idempotencyKey: 'k1' },
     });
     expect(response.statusCode).toBe(201);
