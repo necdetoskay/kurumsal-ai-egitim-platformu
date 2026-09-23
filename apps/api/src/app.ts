@@ -3,26 +3,7 @@ import { Redis } from 'ioredis';
 import { createDatabase } from '@kaep/db';
 import type { AppConfig } from '@kaep/config';
 import { persistConfirmedAudienceAssignments, AudienceAssignmentPersistenceError } from './audience-assignment-persistence.js';
-
-type TrustedAudiencePrincipal = { tenantId: string; userId: string; role: 'tenant_admin' | 'instructor' };
-type TrustedLearnerPrincipal = { tenantId: string; userId: string; role: 'learner' };
-
-function trustedAudiencePrincipal(headers: Record<string, string | string[] | undefined>): TrustedAudiencePrincipal | null {
-  // Temporary trusted-edge adapter: production ingress must strip client-supplied
-  // x-kaep-* headers and inject verified identity. Never accept tenant_id from body/query.
-  const tenantId = typeof headers['x-kaep-tenant-id'] === 'string' ? headers['x-kaep-tenant-id'].trim() : '';
-  const userId = typeof headers['x-kaep-user-id'] === 'string' ? headers['x-kaep-user-id'].trim() : '';
-  const role = headers['x-kaep-role'];
-  if (!tenantId || !userId || (role !== 'tenant_admin' && role !== 'instructor')) return null;
-  return { tenantId, userId, role };
-}
-
-function trustedLearnerPrincipal(headers: Record<string, string | string[] | undefined>): TrustedLearnerPrincipal | null {
-  const tenantId = typeof headers['x-kaep-tenant-id'] === 'string' ? headers['x-kaep-tenant-id'].trim() : '';
-  const userId = typeof headers['x-kaep-user-id'] === 'string' ? headers['x-kaep-user-id'].trim() : '';
-  if (!tenantId || !userId || headers['x-kaep-role'] !== 'learner') return null;
-  return { tenantId, userId, role: 'learner' };
-}
+import { createAuthenticator, AuthenticationError } from './authentication.js';
 
 export function buildApp(config: AppConfig) {
   const app = Fastify({
@@ -30,6 +11,7 @@ export function buildApp(config: AppConfig) {
   });
 
   const database = createDatabase(config.DATABASE_URL);
+  const authenticate = createAuthenticator(config, database);
   const redis = new Redis(config.REDIS_URL, {
     lazyConnect: true,
     maxRetriesPerRequest: 1,
@@ -38,8 +20,10 @@ export function buildApp(config: AppConfig) {
   app.get('/healthz', async () => ({ status: 'ok' }));
 
   app.post('/api/v1/training-audiences/:resolutionId/assignments', async (request, reply) => {
-    const principal = trustedAudiencePrincipal(request.headers);
-    if (!principal) return reply.code(401).send({ code: 'SESSION_REQUIRED' });
+    let principal;
+    try { principal = await authenticate(request.headers.authorization); }
+    catch (error) { return reply.code(401).send({ code: error instanceof AuthenticationError ? error.code : 'TOKEN_INVALID' }); }
+    if (!principal.roleCodes.some((role) => role === 'tenant_admin' || role === 'instructor')) return reply.code(403).send({ code: 'INSUFFICIENT_ROLE' });
 
     const params = request.params as { resolutionId: string };
     const body = (request.body ?? {}) as Partial<{
@@ -79,8 +63,10 @@ export function buildApp(config: AppConfig) {
   });
 
   app.get('/api/v1/learner/assignments', async (request, reply) => {
-    const principal = trustedLearnerPrincipal(request.headers);
-    if (!principal) return reply.code(401).send({ code: 'SESSION_REQUIRED' });
+    let principal;
+    try { principal = await authenticate(request.headers.authorization); }
+    catch (error) { return reply.code(401).send({ code: error instanceof AuthenticationError ? error.code : 'TOKEN_INVALID' }); }
+    if (!principal.roleCodes.includes('learner')) return reply.code(403).send({ code: 'INSUFFICIENT_ROLE' });
     const result = await database.pool.query(
       `select a.id, a.training_id as "trainingId", a.training_version_id as "trainingVersionId",
               a.status, a.assigned_at as "assignedAt", a.completed_at as "completedAt",
@@ -95,8 +81,10 @@ export function buildApp(config: AppConfig) {
   });
 
   app.get('/api/v1/learner/trainings/:trainingId', async (request, reply) => {
-    const principal = trustedLearnerPrincipal(request.headers);
-    if (!principal) return reply.code(401).send({ code: 'SESSION_REQUIRED' });
+    let principal;
+    try { principal = await authenticate(request.headers.authorization); }
+    catch (error) { return reply.code(401).send({ code: error instanceof AuthenticationError ? error.code : 'TOKEN_INVALID' }); }
+    if (!principal.roleCodes.includes('learner')) return reply.code(403).send({ code: 'INSUFFICIENT_ROLE' });
     const { trainingId } = request.params as { trainingId: string };
     const result = await database.pool.query(
       `select a.id as "assignmentId", a.training_id as "trainingId",
@@ -114,8 +102,10 @@ export function buildApp(config: AppConfig) {
   });
 
   app.put('/api/v1/learner/progress/:trainingVersionId', async (request, reply) => {
-    const principal = trustedLearnerPrincipal(request.headers);
-    if (!principal) return reply.code(401).send({ code: 'SESSION_REQUIRED' });
+    let principal;
+    try { principal = await authenticate(request.headers.authorization); }
+    catch (error) { return reply.code(401).send({ code: error instanceof AuthenticationError ? error.code : 'TOKEN_INVALID' }); }
+    if (!principal.roleCodes.includes('learner')) return reply.code(403).send({ code: 'INSUFFICIENT_ROLE' });
     const { trainingVersionId } = request.params as { trainingVersionId: string };
     const body = (request.body ?? {}) as { assignmentId?: string; sourceId?: string; completed?: boolean; tenantId?: string; learnerId?: string };
     if ('tenantId' in body || 'learnerId' in body) return reply.code(400).send({ code: 'CLIENT_IDENTITY_OVERRIDE_FORBIDDEN' });
@@ -147,8 +137,10 @@ export function buildApp(config: AppConfig) {
   });
 
   app.get('/api/v1/learner/trainings/:trainingVersionId/resume', async (request, reply) => {
-    const principal = trustedLearnerPrincipal(request.headers);
-    if (!principal) return reply.code(401).send({ code: 'SESSION_REQUIRED' });
+    let principal;
+    try { principal = await authenticate(request.headers.authorization); }
+    catch (error) { return reply.code(401).send({ code: error instanceof AuthenticationError ? error.code : 'TOKEN_INVALID' }); }
+    if (!principal.roleCodes.includes('learner')) return reply.code(403).send({ code: 'INSUFFICIENT_ROLE' });
     const { trainingVersionId } = request.params as { trainingVersionId: string };
     const result = await database.pool.query(
       `select e.source_id as "sourceId", e.payload, e.occurred_at as "occurredAt"
