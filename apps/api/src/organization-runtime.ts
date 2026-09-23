@@ -13,6 +13,19 @@ export function createOrganizationRuntime(database: DatabaseClient) {
         values($1,$2,$3,$4,$5,$6,$7) returning *`,[p.tenantId,input.name,input.code,input.sector??null,input.defaultLocale??'tr-TR',input.timezone??'Europe/Istanbul',input.description??null]);
       return r.rows[0];
     },
+    async getOrganizationTree(p: OrgPrincipal, organizationId:string) {
+      const org=(await q('select * from organizations where tenant_id=$1 and id=$2',[p.tenantId,organizationId])).rows[0];
+      if(!org) return null;
+      const companies=(await q('select * from companies where tenant_id=$1 and organization_id=$2 order by name',[p.tenantId,organizationId])).rows;
+      const departments=(await q(`select d.* from departments d join companies c on c.tenant_id=d.tenant_id and c.id=d.company_id where d.tenant_id=$1 and c.organization_id=$2 order by d.sort_order,d.name`,[p.tenantId,organizationId])).rows;
+      return { ...org, companies: companies.map((company:any)=>({...company,departments:departments.filter((d:any)=>d.company_id===company.id)})) };
+    },
+    async listEmployees(p: OrgPrincipal, organizationId:string) {
+      return (await q('select * from employees where tenant_id=$1 and organization_id=$2 order by last_name,first_name',[p.tenantId,organizationId])).rows;
+    },
+    async listGroups(p: OrgPrincipal, organizationId:string) {
+      return (await q('select * from groups where tenant_id=$1 and organization_id=$2 order by name',[p.tenantId,organizationId])).rows;
+    },
     async createCompany(p: OrgPrincipal, organizationId:string, input:any) {
       const r=await q(`insert into companies(tenant_id,organization_id,name,legal_name,code,tax_number,email,phone,website)
         select $1,id,$3,$4,$5,$6,$7,$8,$9 from organizations where tenant_id=$1 and id=$2 returning *`,
